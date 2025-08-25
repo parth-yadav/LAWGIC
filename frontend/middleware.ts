@@ -13,8 +13,8 @@ export async function middleware(request: NextRequest) {
   const accessToken = cookieStore.get("accessToken")?.value;
   const refreshToken = cookieStore.get("refreshToken")?.value;
 
-  if (!isAuthRoute && !refreshToken) {
-    return NextResponse.redirect(new URL("/login", request.url));
+  if (isAuthRoute && accessToken && refreshToken) {
+    return NextResponse.redirect(new URL("/", request.url));
   }
 
   if (!isAuthRoute && !accessToken && refreshToken) {

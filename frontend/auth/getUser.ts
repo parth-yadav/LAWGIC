@@ -9,9 +9,6 @@ const getUser = async (): Promise<User | null> => {
     let accessToken = cookieStore.get("accessToken")?.value;
     const refreshToken = cookieStore.get("refreshToken")?.value;
 
-    console.log("Access Token:", accessToken);
-    console.log("Refresh Token:", refreshToken);
-
     if (!refreshToken) return null;
     if (!accessToken) {
       accessToken = await getNewAccessToken(refreshToken);

@@ -34,6 +34,32 @@ export const getUser = async (req: Request, res: Response) => {
   }
 };
 
+export const updateUser = async (req: Request, res: Response) => {
+  try {
+    const userId = req.user.id;
+    const updatedData = req.body;
+
+    const user = await prisma.user.update({
+      where: { id: userId },
+      data: updatedData,
+    });
+
+    return sendResponse({
+      res,
+      success: true,
+      data: { user },
+    });
+  } catch (error) {
+    return sendResponse({
+      res,
+      success: false,
+      error: {
+        message: getErrorMessage(error, "Failed to update user information"),
+      },
+    });
+  }
+};
+
 export const refreshUserToken = async (req: Request, res: Response) => {
   const clientRefreshToken =
     req.cookies?.refreshToken || req.headers["refreshToken"];

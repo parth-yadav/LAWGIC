@@ -3,21 +3,21 @@ import cors from "cors";
 import dotenv from "dotenv";
 import cookieParser from "cookie-parser";
 import authRouter from "./routes/auth.routes";
+import { clientBaseUrl } from "./utils/auth";
 
 dotenv.config();
 
 const app = express();
 
 const PORT = process.env.PORT || 6900;
-// const clientOrigin = process.env.CLIENT_URL || "http://localhost:3000";
 
-app.use(cors());
-// app.use(
-//   cors({
-//     origin: clientOrigin,
-//     credentials: true,
-//   })
-// );
+app.use(
+  cors({
+    origin: clientBaseUrl,
+    credentials: true,
+  })
+);
+
 app.use(express.json());
 app.use(cookieParser());
 app.use(express.urlencoded({ extended: false }));

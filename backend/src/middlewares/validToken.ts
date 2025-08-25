@@ -18,9 +18,7 @@ export default async function validToken(
   next: NextFunction
 ): Promise<Response | void> {
   try {
-    const accessToken =
-      req.cookies?.accessToken ||
-      req.header("Authorization")?.replace("Bearer ", "");
+    const accessToken = req.cookies?.accessToken || req.headers["access-token"];
 
     if (!accessToken) {
       throw "Unauthorized request";

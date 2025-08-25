@@ -2,76 +2,26 @@ import prisma from "@/prisma/client";
 import {
   accessSecret,
   accessTokenExpiry,
+  clientBaseUrl,
   cookieOptions,
+  getExpiryDate,
   refreshSecret,
   refreshTokenExpiry,
 } from "@/utils/auth";
-import { getExpiryDate } from "@/utils/getExpiryDate";
 import jwt from "jsonwebtoken";
 import { StringValue } from "ms";
 import { getErrorMessage } from "@/utils/utils";
 import { Request, Response } from "express";
 import { sendResponse } from "@/utils/ResponseHelpers";
-import { oauth2Client } from "@/utils/googleClient";
 import axios from "axios";
-
-export const generateAndSetTokens = async ({
-  req,
-  res,
-  userId,
-}: {
-  req: Request;
-  res: Response;
-  userId: string;
-}) => {
-  const user = await prisma.user.findUnique({
-    where: { id: userId },
-  });
-
-  if (!user) throw new Error("User not found");
-
-  const accessToken = jwt.sign(
-    { id: user.id, email: user.email } as AccessTokenPayload,
-    accessSecret,
-    { expiresIn: accessTokenExpiry as StringValue }
-  );
-
-  const refreshToken = jwt.sign(
-    { id: user.id } as RefreshTokenPayload,
-    refreshSecret,
-    {
-      expiresIn: refreshTokenExpiry as StringValue,
-    }
-  );
-
-  const clientInfo = {
-    userAgent: req?.headers?.["user-agent"],
-    host: req?.headers?.["host"],
-    ip: req?.headers?.["x-forwarded-for"] || req?.socket?.remoteAddress,
-  };
-
-  await prisma.refreshToken.create({
-    data: {
-      token: refreshToken,
-      userId: user.id,
-      expiresAt: getExpiryDate(refreshTokenExpiry),
-      clientInfo,
-    },
-  });
-
-  res
-    .cookie("accessToken", accessToken, cookieOptions)
-    .cookie("refreshToken", refreshToken, cookieOptions);
-
-  return { accessToken, refreshToken };
-};
+import { oAuth2Client } from "@/utils/googleClient";
 
 export const getUser = async (req: Request, res: Response) => {
   try {
     return sendResponse({
       res,
       success: true,
-      data: req.user,
+      data: { user: req.user },
     });
   } catch (error) {
     return sendResponse({
@@ -114,16 +64,21 @@ export const refreshUserToken = async (req: Request, res: Response) => {
       throw new Error("Invalid refresh token");
     }
 
-    const { accessToken, refreshToken } = await generateAndSetTokens({
-      userId: dbRefreshToken.user.id,
-      req,
-      res,
-    });
+    const accessToken = jwt.sign(
+      {
+        id: dbRefreshToken.user.id,
+        email: dbRefreshToken.user.email,
+      } as AccessTokenPayload,
+      accessSecret,
+      { expiresIn: accessTokenExpiry as StringValue }
+    );
+
+    res.cookie("accessToken", accessToken, cookieOptions);
 
     return sendResponse({
       res,
       success: true,
-      data: { accessToken, refreshToken },
+      data: { accessToken, refreshToken: clientRefreshToken },
       message: "Token refreshed successfully",
     });
   } catch (error) {
@@ -142,7 +97,94 @@ export const refreshUserToken = async (req: Request, res: Response) => {
   }
 };
 
-export const googleAuth = async (req: Request, res: Response) => {
+export const getNewAccessToken = async (req: Request, res: Response) => {
+  const clientRefreshToken =
+    req.cookies?.refreshToken || req.headers["refresh-token"];
+
+  if (!clientRefreshToken) {
+    return sendResponse({
+      res,
+      statusCode: 401,
+      success: false,
+      error: {
+        message: "Unauthorized request",
+      },
+    });
+  }
+
+  try {
+    const { id: userId } = jwt.verify(
+      clientRefreshToken,
+      refreshSecret
+    ) as RefreshTokenPayload;
+
+    const dbRefreshToken = await prisma.refreshToken.findUnique({
+      where: { userId: userId, token: clientRefreshToken },
+      include: { user: true },
+    });
+
+    if (!dbRefreshToken?.user) {
+      throw new Error("Invalid refresh token");
+    }
+
+    const accessToken = jwt.sign(
+      {
+        id: dbRefreshToken.user.id,
+        email: dbRefreshToken.user.email,
+      } as AccessTokenPayload,
+      accessSecret,
+      { expiresIn: accessTokenExpiry as StringValue }
+    );
+
+    return sendResponse({
+      res,
+      success: true,
+      data: { accessToken, refreshToken: clientRefreshToken },
+      message: "Token refreshed successfully",
+    });
+  } catch (error) {
+    return sendResponse({
+      res,
+      success: false,
+      error: {
+        message: getErrorMessage(
+          error,
+          getErrorMessage(error, "Failed to refresh token")
+        ),
+        details: error,
+      },
+      statusCode: 403,
+    });
+  }
+};
+
+export const googleAuthUrl = (_req: Request, res: Response) => {
+  try {
+    const authorizeUrl = oAuth2Client.generateAuthUrl({
+      access_type: "offline",
+      scope: [
+        "https://www.googleapis.com/auth/userinfo.profile",
+        "https://www.googleapis.com/auth/userinfo.email",
+      ],
+      prompt: "consent",
+    });
+    return sendResponse({
+      res,
+      success: true,
+      data: { url: authorizeUrl },
+    });
+  } catch (error) {
+    return sendResponse({
+      res,
+      success: false,
+      error: {
+        message: getErrorMessage(error, "Failed to get Google Auth URL"),
+      },
+    });
+  }
+};
+
+export const googleAuthCallback = async (req: Request, res: Response) => {
   try {
     const code = req.query.code;
     if (!code || typeof code !== "string") {
@@ -156,12 +198,21 @@ export const googleAuth = async (req: Request, res: Response) => {
       });
     }
 
-    const googleRes = await oauth2Client.getToken(code);
-    oauth2Client.setCredentials(googleRes.tokens);
-    const userRes = await axios.get(
-      `https://www.googleapis.com/oauth2/v1/userinfo?alt=json&access_token=${googleRes.tokens.access_token}`
+    const { tokens } = await oAuth2Client.getToken(code);
+
+    oAuth2Client.setCredentials(tokens);
+
+    const { id_token, access_token } = tokens;
+
+    const { data: GoogleUserInfo } = await axios.get(
+      `https://www.googleapis.com/oauth2/v1/userinfo?alt=json&access_token=${access_token}`,
+      {
+        headers: {
+          Authorization: `Bearer ${id_token}`,
+        },
+      }
     );
-    const { email, name, picture } = userRes.data as {
+    const { email, name, picture } = GoogleUserInfo as {
       email: string;
       name: string;
       picture: string;
@@ -179,24 +230,78 @@ export const googleAuth = async (req: Request, res: Response) => {
       });
     }
 
-    const { accessToken, refreshToken } = await generateAndSetTokens({
-      userId: user.id,
-      req,
-      res,
+    const accessToken = jwt.sign(
+      { id: user.id, email: user.email } as AccessTokenPayload,
+      accessSecret,
+      { expiresIn: accessTokenExpiry as StringValue }
+    );
+
+    const refreshToken = jwt.sign(
+      { id: user.id } as RefreshTokenPayload,
+      refreshSecret,
+      {
+        expiresIn: refreshTokenExpiry as StringValue,
+      }
+    );
+
+    const clientInfo = {
+      userAgent: req?.headers?.["user-agent"] ?? "N/A",
+      host: req?.headers?.["host"] ?? "N/A",
+      ip:
+        (req?.headers?.["x-forwarded-for"] || req?.socket?.remoteAddress) ??
+        "N/A",
+    };
+
+    await prisma.refreshToken.create({
+      data: {
+        token: refreshToken,
+        userId: user.id,
+        expiresAt: getExpiryDate(refreshTokenExpiry),
+        clientInfo,
+      },
     });
+
+    res
+      .cookie("accessToken", accessToken, cookieOptions)
+      .cookie("refreshToken", refreshToken, cookieOptions);
+
+    return res.redirect(clientBaseUrl);
+  } catch (error) {
+    console.error("Google Auth Callback Error:", error);
+    return res.redirect(
+      encodeURI(
+        `${clientBaseUrl}/login?error=Failed to authenticate with Google`
+      )
+    );
+  }
+};
+
+export const logoutUser = async (req: Request, res: Response) => {
+  try {
+    const clientRefreshToken =
+      req.cookies?.refreshToken || req.headers["refresh-token"];
+
+    await prisma.refreshToken.delete({
+      where: {
+        token: clientRefreshToken,
+      },
+    });
+
+    res
+      .clearCookie("accessToken", cookieOptions)
+      .clearCookie("refreshToken", cookieOptions);
 
     return sendResponse({
       res,
       success: true,
-      data: { accessToken, refreshToken, user },
-      message: "Authenticated with Google successfully",
+      message: "User logged out successfully",
     });
   } catch (error) {
     return sendResponse({
       res,
       success: false,
       error: {
-        message: getErrorMessage(error, "Failed to authenticate with Google"),
+        message: getErrorMessage(error, "Failed to logout"),
       },
     });
   }

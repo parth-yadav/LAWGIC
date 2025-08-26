@@ -14,10 +14,11 @@ const authRouter = express.Router();
 
 authRouter.get("/user", validToken, getUser);
 authRouter.post("/user", validToken, updateUser);
+authRouter.post("/logout", validToken, logoutUser);
+
 authRouter.post("/refresh", refreshUserToken);
 authRouter.get("/refresh", getNewAccessToken);
 authRouter.get("/google/url", googleAuthUrl);
 authRouter.get("/google/callback", googleAuthCallback);
-authRouter.post("/logout", logoutUser);
 
 export default authRouter;

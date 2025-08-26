@@ -2,6 +2,7 @@ import Link from "next/link";
 import ThemeSwitch from "../ThemeSwitch";
 import { cn } from "@/lib/utils";
 import { anurati } from "@/utils/fonts";
+import { appName } from "@/utils/data";
 
 export default function AuthHeader() {
   return (
@@ -11,7 +12,7 @@ export default function AuthHeader() {
           href={"/"}
           className={cn("text-foreground text-xl font-bold", anurati.className)}
         >
-          SKILLIPSE
+          {appName}
         </Link>
 
         <ThemeSwitch />

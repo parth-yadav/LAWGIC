@@ -7,6 +7,8 @@ import {
   useState,
   ReactNode,
   useEffect,
+  SetStateAction,
+  Dispatch,
 } from "react";
 
 interface SessionContextType {
@@ -14,6 +16,7 @@ interface SessionContextType {
   status: "loading" | "authenticated" | "unauthenticated";
   error: string | null;
   refreshSession: () => Promise<void>;
+  setUser: Dispatch<SetStateAction<User | null>>;
 }
 
 const SessionContext = createContext<SessionContextType>({
@@ -21,6 +24,7 @@ const SessionContext = createContext<SessionContextType>({
   status: "loading",
   error: null,
   refreshSession: async () => {},
+  setUser: () => {},
 });
 
 export default function SessionProvider({ children }: { children: ReactNode }) {
@@ -29,6 +33,10 @@ export default function SessionProvider({ children }: { children: ReactNode }) {
   const [status, setStatus] = useState<SessionContextType["status"]>("loading");
 
   const fetchSession = async () => {
+    setUser(null);
+    setStatus("loading");
+    setError(null);
+
     try {
       const user = await getUser();
       if (user) {
@@ -55,6 +63,7 @@ export default function SessionProvider({ children }: { children: ReactNode }) {
     status,
     error,
     refreshSession: fetchSession,
+    setUser,
   };
 
   return (

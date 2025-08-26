@@ -18,6 +18,8 @@ export async function middleware(request: NextRequest) {
         name: "accessToken",
         value: newAccessToken.accessToken,
         maxAge: newAccessToken.maxAge,
+        httpOnly: true,
+        secure: process.env.NODE_ENV === "production",
       });
     }
   }

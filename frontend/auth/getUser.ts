@@ -22,6 +22,8 @@ export default async function getUser(): Promise<User | null> {
         name: "accessToken",
         value: newAccessToken.accessToken,
         maxAge: newAccessToken.maxAge,
+        httpOnly: true,
+        secure: process.env.NODE_ENV === "production",
       });
     }
     if (!accessToken) return null;

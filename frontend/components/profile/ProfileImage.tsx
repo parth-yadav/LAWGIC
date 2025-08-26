@@ -50,9 +50,10 @@ async function getCroppedImg(
 }
 
 export default function ProfileImage({ user }: { user: User }) {
-  const { refreshSession } = useSession();
+  const { setUser } = useSession();
+
   const [imageUrl, setImageUrl] = useState<string | null>(
-    user?.avatar || "/images/blankProfilePicture.jpg"
+    `/api/avatar?url=${user?.avatar}`
   );
   const [src, setSrc] = useState<string | null>(null);
   const [crop, setCrop] = useState<Crop | undefined>(undefined);
@@ -90,11 +91,13 @@ export default function ProfileImage({ user }: { user: User }) {
             folder: "avatars",
           });
           if (data) {
-            console.log("Uploaded file:", data.fileUrl);
-            setImageUrl(data.fileUrl);
+            const newAvatarUrl = `/api/avatar?url=${data.fileUrl}`;
+            setImageUrl(newAvatarUrl);
             await ApiClient.post("/auth/user", { avatar: data.fileUrl });
             toast.success("Updated Profile Image successfully !!");
-            refreshSession();
+            setUser((prev) =>
+              prev ? { ...prev, avatar: data.fileUrl } : prev
+            );
             setSrc(null);
           } else if (errorMessage) {
             toast.error(errorMessage);
@@ -158,7 +161,7 @@ export default function ProfileImage({ user }: { user: User }) {
         ) : imageUrl ? (
           <>
             <div className="relative flex size-54 flex-col items-center justify-center overflow-hidden rounded-2xl">
-              <Image
+              <img
                 src={imageUrl}
                 alt="profile-image"
                 width={500}
@@ -195,7 +198,7 @@ export default function ProfileImage({ user }: { user: User }) {
             </div>
             <Button
               variant="destructive"
-              onClick={() => setImageUrl(user?.avatar || null)}
+              onClick={() => setImageUrl(`/api/avatar?url=${user?.avatar}`)}
               disabled={!user?.avatar}
               className="mx-auto mt-2 w-full"
             >

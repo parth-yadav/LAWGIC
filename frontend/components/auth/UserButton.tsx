@@ -44,9 +44,7 @@ export default function UserButton({ className = "" }: { className?: string }) {
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Avatar className="cursor-pointer">
-              <AvatarImage
-                src={user?.avatar || `/images/blankProfilePicture.jpg`}
-              />
+              <AvatarImage src={`/api/avatar?url=${user.avatar}`} />
               <AvatarFallback>{initials}</AvatarFallback>
             </Avatar>
           </DropdownMenuTrigger>

@@ -2,8 +2,9 @@ import express from "express";
 import cors from "cors";
 import dotenv from "dotenv";
 import cookieParser from "cookie-parser";
-import authRouter from "./routes/auth.routes";
-import { clientBaseUrl } from "./utils/auth";
+import authRouter from "./routes/auth.routes.js";
+import docProcessorRouter from "./routes/docProcessor.routes.js";
+import { clientBaseUrl } from "./utils/auth.js";
 
 dotenv.config();
 
@@ -27,6 +28,7 @@ app.get("/", (_req, res) => {
 });
 
 app.use("/auth", authRouter);
+app.use("/documents", docProcessorRouter);
 
 app.listen(PORT, () => {
   console.log(`Server is running on port ${PORT}`);

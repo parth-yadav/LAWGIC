@@ -1,3 +1,5 @@
+import getUser from "@/auth/getUser";
+import Unauthenticated from "@/components/auth/Unauthenticated";
 import Main from "@/components/Main";
 import NavBar from "@/components/NavBar";
 import { cn } from "@/lib/utils";
@@ -9,6 +11,10 @@ export default async function MainLayout({
 }: {
   children: ReactNode;
 }) {
+  const user = await getUser();
+
+  if (!user) return <Unauthenticated />;
+
   return (
     <>
       <NavBar />

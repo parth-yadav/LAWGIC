@@ -1,15 +1,16 @@
 import prisma from "@/prisma/client";
 import {
   accessSecret,
+  accessTokenCookieOptions,
   accessTokenExpiry,
   clientBaseUrl,
-  cookieOptions,
   getExpiryDate,
   refreshSecret,
+  refreshTokenCookieOptions,
   refreshTokenExpiry,
 } from "@/utils/auth";
 import jwt from "jsonwebtoken";
-import { StringValue } from "ms";
+import ms, { StringValue } from "ms";
 import { getErrorMessage } from "@/utils/utils";
 import { Request, Response } from "express";
 import { sendResponse } from "@/utils/ResponseHelpers";
@@ -99,7 +100,7 @@ export const refreshUserToken = async (req: Request, res: Response) => {
       { expiresIn: accessTokenExpiry as StringValue }
     );
 
-    res.cookie("accessToken", accessToken, cookieOptions);
+    res.cookie("accessToken", accessToken, accessTokenCookieOptions);
 
     return sendResponse({
       res,
@@ -165,7 +166,7 @@ export const getNewAccessToken = async (req: Request, res: Response) => {
     return sendResponse({
       res,
       success: true,
-      data: { accessToken, refreshToken: clientRefreshToken },
+      data: { accessToken, maxAge: ms(accessTokenExpiry) },
       message: "Token refreshed successfully",
     });
   } catch (error) {
@@ -288,8 +289,8 @@ export const googleAuthCallback = async (req: Request, res: Response) => {
     });
 
     res
-      .cookie("accessToken", accessToken, cookieOptions)
-      .cookie("refreshToken", refreshToken, cookieOptions);
+      .cookie("accessToken", accessToken, accessTokenCookieOptions)
+      .cookie("refreshToken", refreshToken, refreshTokenCookieOptions);
 
     return res.redirect(clientBaseUrl);
   } catch (error) {
@@ -314,8 +315,8 @@ export const logoutUser = async (req: Request, res: Response) => {
     });
 
     res
-      .clearCookie("accessToken", cookieOptions)
-      .clearCookie("refreshToken", cookieOptions);
+      .clearCookie("accessToken", accessTokenCookieOptions)
+      .clearCookie("refreshToken", refreshTokenCookieOptions);
 
     return sendResponse({
       res,

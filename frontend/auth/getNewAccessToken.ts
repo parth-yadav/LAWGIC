@@ -1,6 +1,6 @@
 export default async function getNewAccessToken(
   refreshToken: string
-): Promise<string | undefined> {
+): Promise<{ accessToken: string; maxAge: number } | undefined> {
   try {
     const response = await fetch(
       `${process.env.NEXT_PUBLIC_SERVER_BASE_URL}/auth/refresh`,
@@ -14,10 +14,10 @@ export default async function getNewAccessToken(
     );
 
     const {
-      data: { accessToken },
+      data: { accessToken, maxAge },
     } = await response.json();
 
-    return accessToken;
+    return { accessToken, maxAge };
   } catch (error) {
     console.error("Failed to get new access token:", error);
     return undefined;

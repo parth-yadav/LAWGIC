@@ -5,9 +5,8 @@ import ProfileForm from "@/components/profile/ProfileForm";
 
 export default async function ProfilePage() {
   const user = await getUser();
-  if (!user) {
-    return <Unauthenticated />;
-  }
+
+  if (!user) return <Unauthenticated />;
 
   return (
     <section className="flex w-full flex-col p-4 items-center max-w-2xl mx-auto">

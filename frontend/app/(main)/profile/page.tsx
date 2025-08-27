@@ -1,6 +1,6 @@
+import getUser from "@/auth/getUser";
 import RevealHero from "@/components/animations/RevealHero";
 import Unauthenticated from "@/components/auth/Unauthenticated";
-import getUser from "@/auth/getUser";
 import ProfileForm from "@/components/profile/ProfileForm";
 
 export default async function ProfilePage() {

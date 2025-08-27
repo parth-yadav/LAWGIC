@@ -9,8 +9,10 @@ import { useRouter } from "next/navigation";
 
 export default function SignOutButton({
   className = "",
+  type = "redirect",
 }: {
   className?: string;
+  type?: "redirect" | "refresh";
 }) {
   const router = useRouter();
   const [signingOut, startSignOut] = useTransition();
@@ -21,7 +23,11 @@ export default function SignOutButton({
         startSignOut(async () => {
           await ApiClient.post("/auth/logout");
           toast.success("Signed out !!");
-          router.push("/login");
+          if (type === "refresh") {
+            router.refresh();
+          } else {
+            router.push("/login");
+          }
         });
       }}
       disabled={signingOut}

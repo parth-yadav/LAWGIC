@@ -1,31 +1,17 @@
 "use server";
 
-import { cookies } from "next/headers";
-import getNewAccessToken from "./getNewAccessToken";
+import { cookies, headers } from "next/headers";
 
 export default async function getUser(): Promise<User | null> {
   try {
     const cookieStore = await cookies();
+    const headersStore = await headers();
 
-    let accessToken = cookieStore.get("accessToken")?.value ?? null;
-    const refreshToken = cookieStore.get("refreshToken")?.value ?? null;
+    const accessToken =
+      cookieStore.get("accessToken")?.value ??
+      headersStore.get("x-access-token") ??
+      null;
 
-    if (!refreshToken) return null;
-
-    if (!accessToken) {
-      const newAccessToken = await getNewAccessToken(refreshToken);
-      if (typeof newAccessToken?.accessToken !== "string") return null;
-
-      accessToken = newAccessToken.accessToken;
-
-      cookieStore.set({
-        name: "accessToken",
-        value: newAccessToken.accessToken,
-        maxAge: newAccessToken.maxAge,
-        httpOnly: true,
-        secure: process.env.NODE_ENV === "production",
-      });
-    }
     if (!accessToken) return null;
 
     const response = await fetch(
@@ -39,9 +25,10 @@ export default async function getUser(): Promise<User | null> {
       }
     );
     if (!response.ok) {
-      console.error("Failed to fetch user:", response.statusText);
+      console.error("Failed to fetch user.");
       return null;
     }
+
     const {
       data: { user },
     }: { data: { user: User } } = await response.json();

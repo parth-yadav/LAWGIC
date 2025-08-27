@@ -1,7 +1,7 @@
-interface ApiResponse {
+interface ApiResponseData<T> {
   success: boolean;
   message?: string;
-  data?: object | string;
+  data?: T;
   error?: {
     message: string;
     details?: any;

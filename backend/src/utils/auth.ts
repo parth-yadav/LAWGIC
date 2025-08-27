@@ -34,6 +34,12 @@ export const clientCallbackPath = process.env.CLIENT_CALLBACK_PATH ?? "";
 export const googleRedirectUrl = `${serverBaseUrl}${googleRedirectPath}`;
 export const clientCallbackUrl = `${clientBaseUrl}${clientCallbackPath}`;
 
+export const testMail = process.env.TEST_MAIL ?? null;
+export const testOtp = process.env.TEST_OTP ?? null;
+
+export const testUser =
+  testMail && testOtp ? { email: testMail, otp: testOtp } : null;
+
 import ms from "ms";
 
 export function getExpiryDate(timeString: string) {

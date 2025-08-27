@@ -8,14 +8,77 @@ import {
   refreshSecret,
   refreshTokenCookieOptions,
   refreshTokenExpiry,
+  testUser,
 } from "@/utils/auth";
 import jwt from "jsonwebtoken";
 import ms, { StringValue } from "ms";
 import { getErrorMessage } from "@/utils/utils";
 import { Request, Response } from "express";
 import { sendResponse } from "@/utils/ResponseHelpers";
-import axios from "axios";
 import { oAuth2Client } from "@/utils/googleClient";
+import { User } from "@prisma/client";
+import crypto from "crypto";
+import sendMail from "@/utils/sendMail";
+import axios from "axios";
+
+export const generateTokens = async (
+  req: Request,
+  res: Response,
+  user: User
+) => {
+  const clientRefreshToken =
+    req.cookies?.refreshToken || req.headers["refresh-token"];
+
+  if (clientRefreshToken) {
+    jwt.verify(clientRefreshToken, refreshSecret);
+
+    await prisma.refreshToken.update({
+      where: {
+        token: clientRefreshToken,
+      },
+      data: {
+        isRevoked: true,
+      },
+    });
+  }
+
+  const accessToken = jwt.sign(
+    { id: user.id, email: user.email } as AccessTokenPayload,
+    accessSecret,
+    { expiresIn: accessTokenExpiry as StringValue }
+  );
+
+  const refreshToken = jwt.sign(
+    { id: user.id, createdAt: new Date() } as RefreshTokenPayload,
+    refreshSecret,
+    {
+      expiresIn: refreshTokenExpiry as StringValue,
+    }
+  );
+
+  const clientInfo = {
+    userAgent: req?.headers?.["user-agent"] ?? "N/A",
+    host: req?.headers?.["host"] ?? "N/A",
+    ip:
+      (req?.headers?.["x-forwarded-for"] || req?.socket?.remoteAddress) ??
+      "N/A",
+  };
+
+  await prisma.refreshToken.create({
+    data: {
+      token: refreshToken,
+      userId: user.id,
+      expiresAt: getExpiryDate(refreshTokenExpiry),
+      clientInfo,
+    },
+  });
+
+  res
+    .cookie("accessToken", accessToken, accessTokenCookieOptions)
+    .cookie("refreshToken", refreshToken, refreshTokenCookieOptions);
+
+  return { accessToken, refreshToken };
+};
 
 export const getUser = async (req: Request, res: Response) => {
   try {
@@ -63,7 +126,7 @@ export const updateUser = async (req: Request, res: Response) => {
 
 export const refreshUserToken = async (req: Request, res: Response) => {
   const clientRefreshToken =
-    req.cookies?.refreshToken || req.headers["refreshToken"];
+    req.cookies?.refreshToken || req.headers["refresh-token"];
 
   if (!clientRefreshToken) {
     return sendResponse({
@@ -75,6 +138,8 @@ export const refreshUserToken = async (req: Request, res: Response) => {
       },
     });
   }
+
+  jwt.verify(clientRefreshToken, refreshSecret);
 
   try {
     const { id: userId } = jwt.verify(
@@ -91,21 +156,16 @@ export const refreshUserToken = async (req: Request, res: Response) => {
       throw new Error("Invalid refresh token");
     }
 
-    const accessToken = jwt.sign(
-      {
-        id: dbRefreshToken.user.id,
-        email: dbRefreshToken.user.email,
-      } as AccessTokenPayload,
-      accessSecret,
-      { expiresIn: accessTokenExpiry as StringValue }
+    const { accessToken, refreshToken } = await generateTokens(
+      req,
+      res,
+      dbRefreshToken.user
     );
-
-    res.cookie("accessToken", accessToken, accessTokenCookieOptions);
 
     return sendResponse({
       res,
       success: true,
-      data: { accessToken, refreshToken: clientRefreshToken },
+      data: { accessToken, refreshToken },
       message: "Token refreshed successfully",
     });
   } catch (error) {
@@ -139,6 +199,8 @@ export const getNewAccessToken = async (req: Request, res: Response) => {
     });
   }
 
+  jwt.verify(clientRefreshToken, refreshSecret);
+
   try {
     const { id: userId } = jwt.verify(
       clientRefreshToken,
@@ -154,19 +216,21 @@ export const getNewAccessToken = async (req: Request, res: Response) => {
       throw new Error("Invalid refresh token");
     }
 
-    const accessToken = jwt.sign(
-      {
-        id: dbRefreshToken.user.id,
-        email: dbRefreshToken.user.email,
-      } as AccessTokenPayload,
-      accessSecret,
-      { expiresIn: accessTokenExpiry as StringValue }
+    const { accessToken, refreshToken } = await generateTokens(
+      req,
+      res,
+      dbRefreshToken.user
     );
 
     return sendResponse({
       res,
       success: true,
-      data: { accessToken, maxAge: ms(accessTokenExpiry) },
+      data: {
+        accessToken,
+        accessTokenExpiresAt: new Date(Date.now() + ms(accessTokenExpiry)),
+        refreshToken,
+        refreshTokenExpiresAt: new Date(Date.now() + ms(refreshTokenExpiry)),
+      },
       message: "Token refreshed successfully",
     });
   } catch (error) {
@@ -181,6 +245,102 @@ export const getNewAccessToken = async (req: Request, res: Response) => {
         details: error,
       },
       statusCode: 403,
+    });
+  }
+};
+
+export const emailLogin = async (req: Request, res: Response) => {
+  try {
+    const { email } = req.body;
+
+    let user = await prisma.user.findUnique({ where: { email } });
+
+    if (!user) {
+      user = await prisma.user.create({
+        data: {
+          email,
+        },
+      });
+    }
+    if (!user) throw new Error("User creation failed");
+
+    await prisma.otp.deleteMany({ where: { userId: user.id } });
+
+    let otp;
+    if (testUser && testUser.email === email) {
+      otp = testUser.otp;
+    } else {
+      otp = crypto.randomInt(100000, 1000000).toString();
+    }
+    const expiresAt = new Date(Date.now() + 5 * 60 * 1000); // 5 minutes from now
+
+    await prisma.otp.create({
+      data: {
+        userId: user.id,
+        otp,
+        expiresAt,
+      },
+    });
+
+    if (!(testUser && testUser.email === email)) {
+      await sendMail({
+        to: email,
+        subject: "Your OTP Code",
+        content: `Your OTP code is ${otp}. It is valid for 5 minutes.`,
+      });
+    }
+
+    return sendResponse({
+      res,
+      success: true,
+      message: `OTP sent to ${email}`,
+      data: { otpExpiresAt: expiresAt },
+    });
+  } catch (error) {
+    return sendResponse({
+      res,
+      success: false,
+      error: {
+        message: getErrorMessage(error, "Failed to login with email"),
+      },
+    });
+  }
+};
+
+export const emailVerify = async (req: Request, res: Response) => {
+  try {
+    const { email, otp } = req.body;
+
+    const user = await prisma.user.findUnique({
+      where: { email },
+      include: { otp: true },
+    });
+
+    if (!user) throw new Error("User not found");
+    if (!user.otp) throw new Error("OTP not found");
+
+    const validOtp = user.otp.otp === otp && user.otp.expiresAt > new Date();
+
+    if (validOtp) {
+      await prisma.otp.delete({ where: { id: user.otp.id } });
+
+      await generateTokens(req, res, user);
+
+      return sendResponse({
+        res,
+        success: true,
+        message: "OTP verified successfully",
+      });
+    } else {
+      throw new Error("OTP did not match or expired !!");
+    }
+  } catch (error) {
+    return sendResponse({
+      res,
+      success: false,
+      error: {
+        message: getErrorMessage(error, "Failed to verify email !!"),
+      },
     });
   }
 };
@@ -257,40 +417,7 @@ export const googleAuthCallback = async (req: Request, res: Response) => {
       });
     }
 
-    const accessToken = jwt.sign(
-      { id: user.id, email: user.email } as AccessTokenPayload,
-      accessSecret,
-      { expiresIn: accessTokenExpiry as StringValue }
-    );
-
-    const refreshToken = jwt.sign(
-      { id: user.id } as RefreshTokenPayload,
-      refreshSecret,
-      {
-        expiresIn: refreshTokenExpiry as StringValue,
-      }
-    );
-
-    const clientInfo = {
-      userAgent: req?.headers?.["user-agent"] ?? "N/A",
-      host: req?.headers?.["host"] ?? "N/A",
-      ip:
-        (req?.headers?.["x-forwarded-for"] || req?.socket?.remoteAddress) ??
-        "N/A",
-    };
-
-    await prisma.refreshToken.create({
-      data: {
-        token: refreshToken,
-        userId: user.id,
-        expiresAt: getExpiryDate(refreshTokenExpiry),
-        clientInfo,
-      },
-    });
-
-    res
-      .cookie("accessToken", accessToken, accessTokenCookieOptions)
-      .cookie("refreshToken", refreshToken, refreshTokenCookieOptions);
+    await generateTokens(req, res, user);
 
     return res.redirect(clientBaseUrl);
   } catch (error) {

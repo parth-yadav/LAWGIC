@@ -1,4 +1,6 @@
 import {
+  emailLogin,
+  emailVerify,
   getNewAccessToken,
   getUser,
   googleAuthCallback,
@@ -18,6 +20,10 @@ authRouter.post("/logout", validToken, logoutUser);
 
 authRouter.post("/refresh", refreshUserToken);
 authRouter.get("/refresh", getNewAccessToken);
+
+authRouter.post("/email/login", emailLogin);
+authRouter.post("/email/verify", emailVerify);
+
 authRouter.get("/google/url", googleAuthUrl);
 authRouter.get("/google/callback", googleAuthCallback);
 

@@ -5,4 +5,5 @@ interface AccessTokenPayload {
 
 interface RefreshTokenPayload {
   id: string;
+  createdAt: Date;
 }

@@ -24,8 +24,11 @@ const envSchema = z.object({
   S3_BUCKET: z.string().min(1, "S3_BUCKET is required"),
   GMAIL_USER: z.string().email("GMAIL_USER must be a valid email"),
   GMAIL_PASS: z.string().min(1, "GMAIL_PASS is required"),
-  TEST_MAIL: z.string().email("TEST_MAIL must be a valid email"),
-  TEST_OTP: z.string().min(6, "TEST_OTP must be at least 6 characters"),
+  TEST_MAIL: z.string().email("TEST_MAIL must be a valid email").optional(),
+  TEST_OTP: z
+    .string()
+    .min(6, "TEST_OTP must be at least 6 characters")
+    .optional(),
 });
 
 const validateEnv = () => {

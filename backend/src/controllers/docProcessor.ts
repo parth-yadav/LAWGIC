@@ -202,30 +202,56 @@ class DocumentProcessor {
     return complexTerms;
   }
 
-  // Extract text from PDF
+  // Extract text from PDF - direct approach
   private async extractTextFromPDF(buffer: Buffer): Promise<string> {
     try {
-      // Use dynamic import to avoid initialization issues
+      console.log('Extracting text from PDF, buffer size:', buffer.length);
+      console.log('Buffer is valid:', Buffer.isBuffer(buffer));
+      
+      console.log('Attempting direct PDF text extraction...');
+      
+      // Import and use pdf-parse directly
       const pdfParse = (await import('pdf-parse')).default;
+      console.log('pdf-parse imported successfully');
+      
       const data = await pdfParse(buffer);
-      return data.text;
+      console.log('PDF parsed successfully!');
+      console.log('Extracted text length:', data.text.length);
+      console.log('Number of pages:', data.numpages);
+      
+      if (data.text && data.text.trim().length > 0) {
+        console.log('Returning actual PDF text content');
+        return data.text.trim();
+      } else {
+        console.log('PDF text extraction returned empty content');
+        throw new Error('PDF contains no extractable text');
+      }
+      
     } catch (error) {
+      console.error('PDF extraction failed:', error);
+      
+      // Instead of fallback analysis, throw the error so we know what went wrong
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      throw new Error(`Failed to extract text from PDF: ${errorMessage}`);
+      throw new Error(`PDF text extraction failed: ${errorMessage}`);
     }
   }
 
   // Extract text from web page or download document from URL
   private async extractTextFromURL(url: string): Promise<string> {
     try {
+      console.log('Processing URL:', url);
+      
       // Check if URL points to a document file
       const urlObj = new URL(url);
       const pathname = urlObj.pathname.toLowerCase();
+      console.log('URL pathname:', pathname);
+      
       const isDocumentFile = pathname.endsWith('.pdf') || 
                             pathname.endsWith('.doc') || 
                             pathname.endsWith('.docx');
 
       if (isDocumentFile) {
+        console.log('Detected as document file, downloading...');
         // Download the document and process it
         const axios = (await import('axios')).default;
         const response = await axios.get(url, { 
@@ -233,13 +259,17 @@ class DocumentProcessor {
           timeout: 30000
         });
         
+        console.log('Download successful, response size:', (response.data as ArrayBuffer).byteLength);
         const buffer = Buffer.from(response.data as ArrayBuffer);
         
         if (pathname.endsWith('.pdf')) {
+          console.log('Processing as PDF...');
           return await this.extractTextFromPDF(buffer);
         } else if (pathname.endsWith('.doc') || pathname.endsWith('.docx')) {
           // For now, throw an error for DOC files as we need additional libraries
           throw new Error('DOC/DOCX file processing from URL is not yet supported. Please upload the file directly.');
+        } else {
+          throw new Error('Unsupported document file type');
         }
       } else {
         // Regular web page - use Puppeteer

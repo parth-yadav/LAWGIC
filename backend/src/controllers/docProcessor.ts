@@ -68,7 +68,35 @@ class DocumentProcessor {
     }));
   }
 
-  // Process text content into augmented lean structure
+  // Process text content from actual PDF pages into augmented lean structure
+  private processTextContentFromPages(pageTexts: string[]): Page[] {
+    const pages: Page[] = [];
+
+    pageTexts.forEach((pageText, pageIndex) => {
+      const pageNumber = pageIndex + 1;
+      const sentences = this.splitIntoSentences(pageText);
+
+      const content: Sentence[] = sentences.map((sentenceText, sentenceIndex) => {
+        const sentenceId = this.generateId('p', pageNumber, 's', sentenceIndex + 1);
+        const words = this.splitIntoWords(sentenceText, sentenceId);
+
+        return {
+          id: sentenceId,
+          text: sentenceText,
+          words
+        };
+      });
+
+      pages.push({
+        page_number: pageNumber,
+        content
+      });
+    });
+
+    return pages;
+  }
+
+  // Legacy method for backward compatibility (URLs and other text sources)
   private processTextContent(text: string): Page[] {
     const sentences = this.splitIntoSentences(text);
     const sentencesPerPage = 20; // Approximate sentences per page
@@ -112,7 +140,7 @@ class DocumentProcessor {
     let threatCounter = 1;
 
     pages.forEach(page => {
-      page.content.forEach(sentence => {
+      page.content.forEach((sentence: Sentence) => {
         const lowerText = sentence.text.toLowerCase();
         
         // Check for high severity threats
@@ -183,8 +211,8 @@ class DocumentProcessor {
     let termCounter = 1;
 
     pages.forEach(page => {
-      page.content.forEach(sentence => {
-        sentence.words.forEach(word => {
+      page.content.forEach((sentence: Sentence) => {
+        sentence.words.forEach((word: Word) => {
           const cleanWord = word.text.toLowerCase().replace(/[^\w]/g, '');
           
           if (legalTerms[cleanWord]) {
@@ -202,37 +230,235 @@ class DocumentProcessor {
     return complexTerms;
   }
 
-  // Extract text from PDF - direct approach
-  private async extractTextFromPDF(buffer: Buffer): Promise<string> {
+  // Extract text from PDF using enhanced page-by-page extraction
+  private async extractTextFromPDF(buffer: Buffer): Promise<{ pages: string[], totalPages: number }> {
     try {
       console.log('Extracting text from PDF, buffer size:', buffer.length);
       console.log('Buffer is valid:', Buffer.isBuffer(buffer));
       
-      console.log('Attempting direct PDF text extraction...');
+      // Use enhanced extraction method that preserves page boundaries
+      const pageTexts = await this.extractPagesWithPdf2pic(buffer);
+      console.log(`Successfully extracted text from ${pageTexts.length} pages using enhanced method`);
       
-      // Import and use pdf-parse directly
-      const pdfParse = (await import('pdf-parse')).default;
-      console.log('pdf-parse imported successfully');
+      // Log first few characters of each page for debugging
+      pageTexts.forEach((pageText, index) => {
+        const preview = pageText.substring(0, 100).replace(/\n/g, ' ');
+        console.log(`Page ${index + 1} preview: "${preview}..."`);
+      });
       
-      const data = await pdfParse(buffer);
-      console.log('PDF parsed successfully!');
-      console.log('Extracted text length:', data.text.length);
-      console.log('Number of pages:', data.numpages);
-      
-      if (data.text && data.text.trim().length > 0) {
-        console.log('Returning actual PDF text content');
-        return data.text.trim();
-      } else {
-        console.log('PDF text extraction returned empty content');
-        throw new Error('PDF contains no extractable text');
-      }
+      return {
+        pages: pageTexts,
+        totalPages: pageTexts.length
+      };
       
     } catch (error) {
       console.error('PDF extraction failed:', error);
       
-      // Instead of fallback analysis, throw the error so we know what went wrong
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       throw new Error(`PDF text extraction failed: ${errorMessage}`);
+    }
+  }
+
+  // Method to extract pages using pdf2pic + OCR or better text extraction
+  private async extractPagesWithPdf2pic(buffer: Buffer): Promise<string[]> {
+    try {
+      // First, try to extract all text and then split by page markers
+      const result = await this.extractTextWithPageMarkers(buffer);
+      if (result.pages.length > 0) {
+        console.log(`Successfully extracted ${result.pages.length} pages using page marker method`);
+        return result.pages;
+      }
+      
+      // Fallback to the original method if page marker method fails
+      return await this.extractPagesWithPdfLib(buffer);
+      
+    } catch (error) {
+      console.error('Enhanced page extraction failed, falling back to pdf-lib method:', error);
+      return await this.extractPagesWithPdfLib(buffer);
+    }
+  }
+
+  // New method: Extract text and split by page markers (more accurate for page boundaries)
+  private async extractTextWithPageMarkers(buffer: Buffer): Promise<{ pages: string[], totalPages: number }> {
+    try {
+      const pdfParse = (await import('pdf-parse')).default;
+      
+      // Extract all text from PDF with page info
+      const pdfData = await pdfParse(buffer, {
+        // Custom page rendering to preserve page breaks
+        pagerender: async (pageData: any) => {
+          const textContent = await pageData.getTextContent();
+          let pageText = '';
+          
+          // Sort text items by their position (y-coordinate, then x-coordinate)
+          const sortedItems = textContent.items.sort((a: any, b: any) => {
+            // Sort by Y position (top to bottom), then X position (left to right)
+            const yDiff = b.transform[5] - a.transform[5]; // Y coordinate (inverted for PDF)
+            if (Math.abs(yDiff) > 5) return yDiff > 0 ? 1 : -1; // If Y difference is significant
+            return a.transform[4] - b.transform[4]; // X coordinate for same line
+          });
+          
+          let currentY = null;
+          for (const item of sortedItems) {
+            const y = Math.round(item.transform[5]);
+            
+            // Add line break for new lines (when Y coordinate changes significantly)
+            if (currentY !== null && Math.abs(y - currentY) > 5) {
+              pageText += '\n';
+            }
+            
+            // Add space if needed (when items are on the same line but separated)
+            if (currentY === y && pageText.length > 0 && !pageText.endsWith(' ') && !pageText.endsWith('\n')) {
+              pageText += ' ';
+            }
+            
+            pageText += item.str;
+            currentY = y;
+          }
+          
+          return pageText;
+        }
+      });
+      
+      const fullText = pdfData.text;
+      const totalPages = pdfData.numpages;
+      
+      console.log(`PDF has ${totalPages} pages, splitting text by content...`);
+      
+      // Split text into pages - look for page indicators
+      const pages = await this.splitTextIntoPages(fullText, totalPages);
+      
+      return {
+        pages: pages,
+        totalPages: pages.length
+      };
+      
+    } catch (error) {
+      console.error('Page marker extraction failed:', error);
+      throw error;
+    }
+  }
+
+  // Smart text splitting based on page indicators and content flow
+  private async splitTextIntoPages(text: string, expectedPages: number): Promise<string[]> {
+    let pages: string[] = [];
+    
+    // Try splitting by "Page X of Y" pattern first
+    const pageMatches = Array.from(text.matchAll(/Page (\d+) of (\d+)/gi));
+    
+    if (pageMatches.length > 0) {
+      console.log(`Found ${pageMatches.length} page markers`);
+      
+      for (let i = 0; i < pageMatches.length; i++) {
+        const prevMatch = i > 0 ? pageMatches[i - 1] : null;
+        const nextMatch = i < pageMatches.length - 1 ? pageMatches[i + 1] : null;
+        
+        const startIndex = prevMatch ? (prevMatch.index! + prevMatch[0].length) : 0;
+        const endIndex = nextMatch ? nextMatch.index! : text.length;
+        
+        const pageText = text.substring(startIndex, endIndex).trim();
+        if (pageText) {
+          pages.push(pageText);
+        }
+      }
+    }
+    
+    // If we don't have enough pages, try splitting by form feed characters
+    if (pages.length === 0 || pages.length < expectedPages / 2) {
+      console.log('Page marker method insufficient, trying form feed splitting...');
+      const formFeedPages = text.split('\f').filter(page => page.trim().length > 0);
+      if (formFeedPages.length > pages.length) {
+        pages = formFeedPages;
+      }
+    }
+    
+    // If still not enough pages, use content-based splitting
+    if (pages.length === 0 || pages.length < expectedPages / 2) {
+      console.log('Trying content-based page splitting...');
+      pages = this.splitByContentLength(text, expectedPages);
+    }
+    
+    console.log(`Split text into ${pages.length} pages`);
+    return pages;
+  }
+
+  // Fallback: Split text by approximate content length
+  private splitByContentLength(text: string, expectedPages: number): string[] {
+    const avgPageLength = Math.ceil(text.length / expectedPages);
+    const pages: string[] = [];
+    
+    let currentPos = 0;
+    for (let i = 0; i < expectedPages; i++) {
+      const targetEnd = Math.min(currentPos + avgPageLength, text.length);
+      
+      // Try to find a good break point (end of sentence or paragraph)
+      let breakPoint = targetEnd;
+      if (i < expectedPages - 1) { // Don't adjust for the last page
+        const searchEnd = Math.min(targetEnd + avgPageLength * 0.3, text.length);
+        for (let j = targetEnd; j < searchEnd; j++) {
+          if (text[j] === '\n' && text[j + 1] === '\n') {
+            breakPoint = j;
+            break;
+          } else if (text[j] === '.' && text[j + 1] === ' ' && text[j + 2] && /[A-Z]/.test(text[j + 2]!)) {
+            breakPoint = j + 1;
+            break;
+          }
+        }
+      }
+      
+      const pageText = text.substring(currentPos, breakPoint).trim();
+      if (pageText) {
+        pages.push(pageText);
+      }
+      
+      currentPos = breakPoint;
+      if (currentPos >= text.length) break;
+    }
+    
+    return pages;
+  }
+
+  // Original pdf-lib method as fallback
+  private async extractPagesWithPdfLib(buffer: Buffer): Promise<string[]> {
+    try {
+      const PDFDocument = (await import('pdf-lib')).PDFDocument;
+      const pdfDoc = await PDFDocument.load(buffer);
+      const pageCount = pdfDoc.getPageCount();
+      
+      console.log(`PDF has ${pageCount} pages, extracting each page individually with pdf-lib...`);
+      
+      const pageTexts: string[] = [];
+      
+      for (let pageIndex = 0; pageIndex < pageCount; pageIndex++) {
+        try {
+          // Create a new PDF with just this page
+          const singlePagePdf = await PDFDocument.create();
+          const [page] = await singlePagePdf.copyPages(pdfDoc, [pageIndex]);
+          singlePagePdf.addPage(page);
+          
+          const singlePageBuffer = Buffer.from(await singlePagePdf.save());
+          
+          // Extract text from this single page
+          const pdfParse = (await import('pdf-parse')).default;
+          const pageData = await pdfParse(singlePageBuffer);
+          
+          const pageText = pageData.text.trim();
+          pageTexts.push(pageText);
+          
+          console.log(`Page ${pageIndex + 1} extracted: ${pageText.length} characters`);
+          
+        } catch (pageError) {
+          console.warn(`Failed to extract page ${pageIndex + 1}:`, pageError);
+          pageTexts.push(''); // Add empty string for failed pages but maintain page count
+        }
+      }
+      
+      console.log(`Successfully extracted ${pageTexts.length} pages with pdf-lib fallback method`);
+      return pageTexts;
+      
+    } catch (error) {
+      console.error('pdf-lib extraction failed:', error);
+      throw error;
     }
   }
 
@@ -264,7 +490,8 @@ class DocumentProcessor {
         
         if (pathname.endsWith('.pdf')) {
           console.log('Processing as PDF...');
-          return await this.extractTextFromPDF(buffer);
+          const pdfData = await this.extractTextFromPDF(buffer);
+          return pdfData.pages.join('\n\n'); // Join all pages with double newlines
         } else if (pathname.endsWith('.doc') || pathname.endsWith('.docx')) {
           // For now, throw an error for DOC files as we need additional libraries
           throw new Error('DOC/DOCX file processing from URL is not yet supported. Please upload the file directly.');
@@ -294,19 +521,21 @@ class DocumentProcessor {
 
   // Main processing method
   async processDocument(input: Buffer | string, type: 'pdf' | 'url', documentId?: string): Promise<AugmentedLeanDocument> {
-    let text: string;
+    let pages: Page[];
     const docId = documentId || this.generateId('doc', Date.now());
 
     try {
       if (type === 'pdf') {
-        text = await this.extractTextFromPDF(input as Buffer);
+        const pdfData = await this.extractTextFromPDF(input as Buffer);
+        pages = this.processTextContentFromPages(pdfData.pages);
+        console.log(`Processed ${pdfData.totalPages} actual PDF pages`);
       } else if (type === 'url') {
-        text = await this.extractTextFromURL(input as string);
+        const text = await this.extractTextFromURL(input as string);
+        pages = this.processTextContent(text);
       } else {
         throw new Error('Unsupported document type');
       }
 
-      const pages = this.processTextContent(text);
       const threats = this.analyzeThreats(pages);
       const complexTerms = this.identifyComplexTerms(pages);
 

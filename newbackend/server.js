@@ -28,15 +28,22 @@ if (!fs.existsSync('uploads')) {
 // Extract text content with bounding boxes from a PDF page
 async function extractPageData(page) {
   const textContent = await page.getTextContent();
-  return textContent.items.map(item => ({
-    text: item.str.trim(),
-    bbox: {
-      x: item.transform[4],
-      y: item.transform[5],
-      width: item.width,
-      height: item.height,
-    },
-  })).filter(item => item.text.length > 0); // Filter out empty strings
+  const viewport = page.getViewport({ scale: 1.0 });
+  
+  return textContent.items.map(item => {
+    // PDF.js provides transform matrix: [scaleX, skewX, skewY, scaleY, translateX, translateY]
+    const transform = item.transform;
+    
+    return {
+      text: item.str.trim(),
+      bbox: {
+        x: transform[4], // translateX
+        y: transform[5], // translateY  
+        width: item.width,
+        height: item.height,
+      },
+    };
+  }).filter(item => item.text.length > 0); // Filter out empty strings
 }
 
 // Analyze text for security threats using Gemini

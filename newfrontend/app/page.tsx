@@ -86,6 +86,31 @@ export default function PdfAnalyzer() {
     }
   }
 
+  // Store viewport for coordinate conversion
+  const [viewport, setViewport] = useState<any>(null);
+
+  // Convert PDF coordinates to HTML coordinates
+  const convertPdfToHtmlCoords = (pdfBbox: any) => {
+    if (!viewport) return null;
+    
+    // PDF coordinates are from bottom-left, HTML coordinates are from top-left
+    const htmlX = pdfBbox.x;
+    const htmlY = viewport.height - pdfBbox.y - pdfBbox.height; // Flip Y coordinate
+    
+    console.log('Coordinate conversion:', {
+      original: pdfBbox,
+      viewport: { width: viewport.width, height: viewport.height },
+      converted: { x: htmlX, y: htmlY, width: pdfBbox.width, height: pdfBbox.height }
+    });
+    
+    return {
+      x: htmlX,
+      y: htmlY,
+      width: pdfBbox.width,
+      height: pdfBbox.height
+    };
+  };
+
   // Render PDF page
   async function renderPdf(file: File, pageNum: number) {
     if (!canvasRef.current) return;
@@ -106,7 +131,9 @@ export default function PdfAnalyzer() {
       const pdf = await loadingTask.promise;
       const page = await pdf.getPage(pageNum);
 
-      const viewport = page.getViewport({ scale });
+      const currentViewport = page.getViewport({ scale });
+      setViewport(currentViewport); // Store viewport for coordinate conversion
+      
       const canvas = canvasRef.current;
       const ctx = canvas.getContext("2d");
       
@@ -114,12 +141,12 @@ export default function PdfAnalyzer() {
         throw new Error("Could not get canvas context");
       }
 
-      canvas.height = viewport.height;
-      canvas.width = viewport.width;
+      canvas.height = currentViewport.height;
+      canvas.width = currentViewport.width;
 
       const renderContext = {
         canvasContext: ctx,
-        viewport: viewport,
+        viewport: currentViewport,
       };
 
       await page.render(renderContext).promise;
@@ -416,8 +443,13 @@ export default function PdfAnalyzer() {
                     />
                     
                     {/* Threat Overlays */}
-                    {currentPageThreats.map((threat, index) =>
-                      threat.bbox ? (
+                    {viewport && currentPageThreats.map((threat, index) => {
+                      if (!threat.bbox) return null;
+                      
+                      const htmlCoords = convertPdfToHtmlCoords(threat.bbox);
+                      if (!htmlCoords) return null;
+                      
+                      return (
                         <div
                           key={index}
                           className={`absolute border-2 pointer-events-none transition-all ${
@@ -426,16 +458,15 @@ export default function PdfAnalyzer() {
                               : 'bg-red-500 bg-opacity-20 border-red-500'
                           }`}
                           style={{
-                            left: `${threat.bbox.x * scale}px`,
-                            top: `${threat.bbox.y * scale}px`,
-                            width: `${threat.bbox.width * scale}px`,
-                            height: `${threat.bbox.height * scale}px`,
-                            transform: `translateY(-${threat.bbox.height * scale}px)`,
+                            left: `${htmlCoords.x}px`,
+                            top: `${htmlCoords.y}px`,
+                            width: `${htmlCoords.width}px`,
+                            height: `${htmlCoords.height}px`,
                           }}
                           title={`${threat.text} - ${threat.reason}`}
                         />
-                      ) : null
-                    )}
+                      );
+                    })}
                   </>
                 ) : (
                   <div className="flex items-center justify-center h-96 text-gray-500">

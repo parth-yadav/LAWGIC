@@ -1,0 +1,5 @@
+PDF Threat Analyzer Backend - Ready for development!
+
+Run: npm install && npm run dev
+
+Don't forget to add your GEMINI_API_KEY to .env file!

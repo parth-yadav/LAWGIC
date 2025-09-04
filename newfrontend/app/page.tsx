@@ -1,9 +1,18 @@
 "use client";
-import { useState, useRef, useEffect } from "react";
-import { getDocument } from "pdfjs-dist";
-import { Upload, AlertTriangle, FileText, Loader2, Eye, Download } from "lucide-react";
-import { setupPDFWorker } from "@/lib/pdfWorker";
+import { useState, useRef, useEffect, useCallback } from "react";
+import { Document, Page, pdfjs } from 'react-pdf';
+import 'react-pdf/dist/Page/AnnotationLayer.css';
+import 'react-pdf/dist/Page/TextLayer.css';
+import { Upload, AlertTriangle, FileText, Loader2, Eye, ZoomIn, ZoomOut } from "lucide-react";
 
+// Configure PDF.js worker
+// Using dynamic import to ensure compatibility with different bundler configurations
+if (typeof window !== 'undefined' && !pdfjs.GlobalWorkerOptions.workerSrc) {
+  pdfjs.GlobalWorkerOptions.workerSrc = "/pdf.worker.min.js";
+}
+
+
+// --- TYPE DEFINITIONS ---
 interface ThreatData {
   text: string;
   reason: string;
@@ -14,6 +23,20 @@ interface ThreatData {
     height: number;
   } | null;
   confidence: number;
+}
+
+interface HighlightData {
+  id: string;
+  text: string;
+  bbox: { // Bbox stores NORMALIZED coordinates (independent of scale)
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+  };
+  page: number;
+  color: string;
+  note?: string;
 }
 
 interface PageData {
@@ -28,32 +51,57 @@ interface AnalysisResult {
   totalThreats: number;
 }
 
+
 export default function PdfAnalyzer() {
   const [file, setFile] = useState<File | null>(null);
+  const [fileUrl, setFileUrl] = useState<string | null>(null);
   const [analysisResult, setAnalysisResult] = useState<AnalysisResult | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState<number>(0);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
-  const [isRendering, setIsRendering] = useState(false);
   const [scale, setScale] = useState(1.2);
   const [selectedThreat, setSelectedThreat] = useState<ThreatData | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [highlights, setHighlights] = useState<HighlightData[]>([]);
+  const [selectedText, setSelectedText] = useState<string>('');
+  const [isLoading, setIsLoading] = useState(false);
   
-  const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
-  // Initialize PDF worker on component mount
+  // Handle file selection and create URL
+  function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const selectedFile = e.target.files?.[0];
+    if (selectedFile && selectedFile.type === "application/pdf") {
+      setFile(selectedFile);
+      
+      // Clean up previous URL
+      if (fileUrl) {
+        URL.revokeObjectURL(fileUrl);
+      }
+      
+      // Create new URL for the file
+      const url = URL.createObjectURL(selectedFile);
+      setFileUrl(url);
+      
+      // Reset states for the new file
+      setAnalysisResult(null);
+      setError(null);
+      setSelectedThreat(null);
+      setCurrentPage(1);
+      setHighlights([]);
+      setSelectedText('');
+      setTotalPages(0); // Reset total pages until new PDF is loaded
+    }
+  }
+
+  // Clean up file URL on component unmount
   useEffect(() => {
-    const initWorker = async () => {
-      try {
-        await setupPDFWorker();
-        console.log('PDF.js worker initialized successfully');
-      } catch (error) {
-        console.error('Failed to setup PDF worker:', error);
-        setError('Failed to initialize PDF worker. Please refresh the page.');
+    return () => {
+      if (fileUrl) {
+        URL.revokeObjectURL(fileUrl);
       }
     };
-    initWorker();
-  }, []);
+  }, [fileUrl]);
 
   // Upload and analyze PDF
   async function handleUpload() {
@@ -72,146 +120,111 @@ export default function PdfAnalyzer() {
       });
 
       if (!response.ok) {
-        throw new Error(`Analysis failed: ${response.status}`);
+        const errorData = await response.json();
+        throw new Error(errorData.message || `Analysis failed: ${response.status}`);
       }
 
       const data = await response.json();
       setAnalysisResult(data);
       setCurrentPage(1);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Analysis failed");
+      setError(err instanceof Error ? err.message : "An unknown error occurred during analysis.");
       console.error("Analysis error:", err);
     } finally {
       setIsAnalyzing(false);
     }
   }
 
-  // Store viewport for coordinate conversion
-  const [viewport, setViewport] = useState<any>(null);
-
-  // Convert PDF coordinates to HTML coordinates
-  const convertPdfToHtmlCoords = (pdfBbox: any) => {
-    if (!viewport) return null;
-    
-    // PDF coordinates are from bottom-left, HTML coordinates are from top-left
-    const htmlX = pdfBbox.x;
-    const htmlY = viewport.height - pdfBbox.y - pdfBbox.height; // Flip Y coordinate
-    
-    console.log('Coordinate conversion:', {
-      original: pdfBbox,
-      viewport: { width: viewport.width, height: viewport.height },
-      converted: { x: htmlX, y: htmlY, width: pdfBbox.width, height: pdfBbox.height }
-    });
-    
-    return {
-      x: htmlX,
-      y: htmlY,
-      width: pdfBbox.width,
-      height: pdfBbox.height
-    };
-  };
-
-  // Render PDF page
-  async function renderPdf(file: File, pageNum: number) {
-    if (!canvasRef.current) return;
-    
-    setIsRendering(true);
+  // --- react-pdf Event Handlers ---
+  const onDocumentLoadSuccess = useCallback(({ numPages }: { numPages: number }) => {
+    setTotalPages(numPages);
+    setIsLoading(false);
     setError(null);
-    
-    try {
-      const arrayBuffer = await file.arrayBuffer();
-      
-      // Simplified PDF loading - worker is already configured
-      const loadingTask = getDocument({
-        data: arrayBuffer,
-        useSystemFonts: true,
-        isEvalSupported: false,
-      });
-      
-      const pdf = await loadingTask.promise;
-      const page = await pdf.getPage(pageNum);
+  }, []);
 
-      const currentViewport = page.getViewport({ scale });
-      setViewport(currentViewport); // Store viewport for coordinate conversion
-      
-      const canvas = canvasRef.current;
-      const ctx = canvas.getContext("2d");
-      
-      if (!ctx) {
-        throw new Error("Could not get canvas context");
-      }
+  const onDocumentLoadError = useCallback((error: Error) => {
+    setError(`Failed to load PDF: ${error.message}. Please ensure it is a valid PDF file.`);
+    setIsLoading(false);
+  }, []);
 
-      canvas.height = currentViewport.height;
-      canvas.width = currentViewport.width;
+  // --- Text Selection and Highlighting Logic ---
+  const handleTextSelection = useCallback(() => {
+    // Use a small timeout to allow the browser to finalize the selection
+    setTimeout(() => {
+      const selection = window.getSelection();
+      const text = selection?.toString().trim() || '';
+      setSelectedText(text);
+    }, 10);
+  }, []);
 
-      const renderContext = {
-        canvasContext: ctx,
-        viewport: currentViewport,
-      };
-
-      await page.render(renderContext).promise;
-      console.log(`Page ${pageNum} rendered successfully`);
-    } catch (err) {
-      console.error("PDF rendering error:", err);
-      const errorMessage = err instanceof Error ? err.message : "Failed to render PDF page";
-      
-      // Provide more helpful error messages
-      if (errorMessage.includes('worker') || errorMessage.includes('fetch')) {
-        setError(`PDF Worker Error: Unable to load PDF.js worker. Please refresh the page and try again.`);
-      } else if (errorMessage.includes('Invalid PDF')) {
-        setError(`PDF File Error: The uploaded file appears to be corrupted or not a valid PDF. Please try a different PDF file.`);
-      } else {
-        setError(`PDF Rendering Error: ${errorMessage}`);
-      }
-    } finally {
-      setIsRendering(false);
+  // ***************************************************************
+  // *** FIXED: Correctly calculate and normalize highlight bounds ***
+  // ***************************************************************
+  const addHighlight = useCallback((color: string = '#ffff00') => {
+    const selection = window.getSelection();
+    if (!selectedText || !selection || selection.rangeCount === 0 || !containerRef.current) {
+      return;
     }
-  }
 
-  // Get threats for current page
+    const range = selection.getRangeAt(0);
+    const selectionRect = range.getBoundingClientRect();
+    const containerRect = containerRef.current.getBoundingClientRect();
+    const scrollTop = containerRef.current.scrollTop;
+    const scrollLeft = containerRef.current.scrollLeft;
+
+    // Calculate position relative to the scrollable container
+    const relativeX = selectionRect.left - containerRect.left + scrollLeft;
+    const relativeY = selectionRect.top - containerRect.top + scrollTop;
+
+    // Normalize coordinates by the current scale to make them independent of zoom level
+    const newHighlight: HighlightData = {
+      id: Date.now().toString(),
+      text: selectedText,
+      bbox: {
+        x: relativeX / scale,
+        y: relativeY / scale,
+        width: selectionRect.width / scale,
+        height: selectionRect.height / scale,
+      },
+      page: currentPage,
+      color: color,
+    };
+
+    setHighlights(prev => [...prev, newHighlight]);
+    setSelectedText(''); // Clear selection after adding highlight
+    selection.removeAllRanges();
+  }, [selectedText, currentPage, scale]);
+
+
+  const removeHighlight = useCallback((id: string) => {
+    setHighlights(prev => prev.filter(h => h.id !== id));
+  }, []);
+
+  const clearPageHighlights = useCallback(() => {
+    setHighlights(prev => prev.filter(h => h.page !== currentPage));
+  }, [currentPage]);
+
+  // --- Data & Helper Functions ---
   const currentPageThreats = analysisResult?.pages.find(p => p.page === currentPage)?.threats || [];
+  const currentPageHighlights = highlights.filter(h => h.page === currentPage);
 
-  // Handle file selection
-  function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
-    const selectedFile = e.target.files?.[0];
-    if (selectedFile && selectedFile.type === "application/pdf") {
-      setFile(selectedFile);
-      setAnalysisResult(null);
-      setError(null);
-      setSelectedThreat(null);
-    }
-  }
-
-  // Handle threat click - scroll to threat location
-  function handleThreatClick(threat: ThreatData) {
+  const handleThreatClick = useCallback((threat: ThreatData) => {
     setSelectedThreat(threat);
-    if (threat.bbox && containerRef.current) {
-      // Scroll to threat location (simplified)
-      console.log("Highlighting threat at:", threat.bbox);
-    }
-  }
+  }, []);
 
-  // Render PDF when file or page changes
-  useEffect(() => {
-    if (file) {
-      renderPdf(file, currentPage);
-    }
-  }, [file, currentPage, scale]);
-
-  const threatSeverity = (reason: string): 'high' | 'medium' | 'low' => {
+  const threatSeverity = useCallback((reason: string): 'high' | 'medium' | 'low' => {
     const highSeverity = ['injection', 'xss', 'command', 'malicious'];
     const mediumSeverity = ['suspicious', 'credential', 'exposure'];
-    
     const lowerReason = reason.toLowerCase();
     if (highSeverity.some(keyword => lowerReason.includes(keyword))) return 'high';
     if (mediumSeverity.some(keyword => lowerReason.includes(keyword))) return 'medium';
     return 'low';
-  };
+  }, []);
 
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
-      <div className="bg-white shadow-sm border-b">
+      <header className="bg-white shadow-sm border-b sticky top-0 z-20">
         <div className="max-w-7xl mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center space-x-3">
@@ -220,254 +233,152 @@ export default function PdfAnalyzer() {
             </div>
             {analysisResult && (
               <div className="flex items-center space-x-4 text-sm text-gray-600">
-                <span className="flex items-center space-x-1">
-                  <FileText className="w-4 h-4" />
-                  <span>{analysisResult.totalPages} pages</span>
-                </span>
-                <span className="flex items-center space-x-1">
-                  <AlertTriangle className="w-4 h-4 text-red-500" />
-                  <span>{analysisResult.totalThreats} threats</span>
-                </span>
+                <span className="flex items-center space-x-1"><FileText className="w-4 h-4" /><span>{analysisResult.totalPages} pages</span></span>
+                <span className="flex items-center space-x-1"><AlertTriangle className="w-4 h-4 text-red-500" /><span>{analysisResult.totalThreats} threats</span></span>
               </div>
             )}
           </div>
         </div>
-      </div>
+      </header>
 
-      <div className="max-w-7xl mx-auto px-4 py-6">
-        <div className="flex gap-6">
+      <main className="max-w-7xl mx-auto px-4 py-6">
+        <div className="flex flex-col lg:flex-row gap-6">
           {/* Sidebar */}
-          <div className="w-80 bg-white rounded-lg shadow-sm border p-6">
+          <aside className="w-full lg:w-96 bg-white rounded-lg shadow-sm border p-6 self-start">
             {/* File Upload */}
             <div className="mb-6">
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Upload PDF Document
-              </label>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Upload PDF Document</label>
               <div className="relative">
-                <input
-                  type="file"
-                  accept="application/pdf"
-                  onChange={handleFileChange}
-                  className="hidden"
-                  id="file-upload"
-                />
-                <label
-                  htmlFor="file-upload"
-                  className="flex items-center justify-center w-full p-4 border-2 border-dashed border-gray-300 rounded-lg cursor-pointer hover:border-gray-400 transition-colors"
-                >
+                <input type="file" accept="application/pdf" onChange={handleFileChange} className="hidden" id="file-upload" />
+                <label htmlFor="file-upload" className="flex items-center justify-center w-full p-4 border-2 border-dashed border-gray-300 rounded-lg cursor-pointer hover:border-red-400 transition-colors">
                   <div className="text-center">
                     <Upload className="w-8 h-8 text-gray-400 mx-auto mb-2" />
-                    <span className="text-sm text-gray-600">
-                      {file ? file.name : "Choose PDF file"}
-                    </span>
+                    <span className="text-sm text-gray-600 truncate block max-w-full">{file ? file.name : "Choose PDF file"}</span>
                   </div>
                 </label>
               </div>
               
               {file && (
-                <button
-                  onClick={handleUpload}
-                  disabled={isAnalyzing}
-                  className="w-full mt-3 bg-red-600 text-white py-2 px-4 rounded-lg hover:bg-red-700 disabled:bg-gray-400 disabled:cursor-not-allowed flex items-center justify-center space-x-2"
-                >
-                  {isAnalyzing ? (
-                    <>
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                      <span>Analyzing...</span>
-                    </>
-                  ) : (
-                    <>
-                      <Eye className="w-4 h-4" />
-                      <span>Analyze Threats</span>
-                    </>
-                  )}
+                <button onClick={handleUpload} disabled={isAnalyzing} className="w-full mt-3 bg-red-600 text-white py-2 px-4 rounded-lg hover:bg-red-700 disabled:bg-gray-400 disabled:cursor-not-allowed flex items-center justify-center space-x-2">
+                  {isAnalyzing ? (<><Loader2 className="w-4 h-4 animate-spin" /><span>Analyzing...</span></>) : (<><Eye className="w-4 h-4" /><span>Analyze Threats</span></>)}
                 </button>
               )}
             </div>
 
             {/* Error Message */}
             {error && (
-              <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg">
-                <div className="flex items-start space-x-2">
-                  <AlertTriangle className="w-5 h-5 text-red-500 mt-0.5 flex-shrink-0" />
-                  <div>
-                    <p className="text-sm font-medium text-red-800 mb-1">Error</p>
-                    <p className="text-sm text-red-600 mb-2">{error}</p>
-                    {error.includes('PDF') && (
-                      <div className="text-xs text-red-500">
-                        <p>Troubleshooting tips:</p>
-                        <ul className="list-disc list-inside mt-1 space-y-1">
-                          <li>Make sure you uploaded a valid PDF file</li>
-                          <li>Try refreshing the page</li>
-                          <li>Check your internet connection</li>
-                          <li>The PDF.js worker library may be temporarily unavailable</li>
-                          <li>Try using a different PDF file to test</li>
-                        </ul>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </div>
+              <div className="mb-6 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">{error}</div>
             )}
 
             {/* Page Navigation */}
-            {analysisResult && (
+            {totalPages > 0 && (
               <div className="mb-6">
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Page Navigation
-                </label>
-                <div className="flex items-center space-x-2">
-                  <button
-                    onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
-                    disabled={currentPage === 1}
-                    className="px-3 py-1 bg-gray-200 text-gray-700 rounded disabled:bg-gray-100 disabled:text-gray-400"
-                  >
-                    ←
-                  </button>
-                  <span className="text-sm text-gray-600 px-3">
-                    {currentPage} / {analysisResult.totalPages}
-                  </span>
-                  <button
-                    onClick={() => setCurrentPage(Math.min(analysisResult.totalPages, currentPage + 1))}
-                    disabled={currentPage === analysisResult.totalPages}
-                    className="px-3 py-1 bg-gray-200 text-gray-700 rounded disabled:bg-gray-100 disabled:text-gray-400"
-                  >
-                    →
-                  </button>
+                <label className="block text-sm font-medium text-gray-700 mb-2">Page Navigation</label>
+                <div className="flex items-center justify-center space-x-2">
+                  <button onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={currentPage === 1} className="px-3 py-1 bg-gray-200 text-gray-700 rounded disabled:opacity-50">←</button>
+                  <span className="text-sm text-gray-600 font-mono px-3"> {currentPage} / {totalPages} </span>
+                  <button onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))} disabled={currentPage === totalPages} className="px-3 py-1 bg-gray-200 text-gray-700 rounded disabled:opacity-50">→</button>
                 </div>
               </div>
             )}
 
             {/* Threats List */}
-            {currentPageThreats.length > 0 && (
+            {analysisResult && (
               <div>
-                <h3 className="text-lg font-semibold text-gray-900 mb-3">
-                  Page {currentPage} Threats ({currentPageThreats.length})
-                </h3>
-                <div className="space-y-3 max-h-96 overflow-y-auto">
-                  {currentPageThreats.map((threat, index) => {
-                    const severity = threatSeverity(threat.reason);
-                    const severityColors = {
-                      high: 'bg-red-50 border-red-200 text-red-800',
-                      medium: 'bg-orange-50 border-orange-200 text-orange-800',
-                      low: 'bg-yellow-50 border-yellow-200 text-yellow-800'
-                    };
-
-                    return (
-                      <div
-                        key={index}
-                        onClick={() => handleThreatClick(threat)}
-                        className={`p-3 border rounded-lg cursor-pointer transition-all hover:shadow-md ${
-                          selectedThreat === threat ? 'ring-2 ring-red-500' : ''
-                        } ${severityColors[severity]}`}
-                      >
-                        <div className="flex items-start space-x-2">
-                          <AlertTriangle className={`w-4 h-4 mt-0.5 flex-shrink-0 ${
-                            severity === 'high' ? 'text-red-600' :
-                            severity === 'medium' ? 'text-orange-600' : 'text-yellow-600'
-                          }`} />
-                          <div className="flex-1 min-w-0">
-                            <p className="font-medium text-sm break-words">
-                              "{threat.text}"
-                            </p>
-                            <p className="text-xs mt-1 opacity-80">
-                              {threat.reason}
-                            </p>
-                            {threat.bbox && (
-                              <p className="text-xs mt-1 opacity-60">
-                                Position: ({Math.round(threat.bbox.x)}, {Math.round(threat.bbox.y)})
-                              </p>
-                            )}
-                          </div>
+                <h3 className="text-lg font-semibold text-gray-900 mb-3">Threats on Page {currentPage} ({currentPageThreats.length})</h3>
+                {currentPageThreats.length > 0 ? (
+                  <div className="space-y-3 max-h-[28rem] overflow-y-auto pr-2">
+                    {currentPageThreats.map((threat, index) => {
+                      const severity = threatSeverity(threat.reason);
+                      const severityColors = {
+                        high: 'bg-red-50 border-red-200 text-red-800',
+                        medium: 'bg-orange-50 border-orange-200 text-orange-800',
+                        low: 'bg-yellow-50 border-yellow-200 text-yellow-800'
+                      };
+                      return (
+                        <div key={index} onClick={() => handleThreatClick(threat)} className={`p-3 border rounded-lg cursor-pointer transition-all hover:shadow-md ${selectedThreat === threat ? 'ring-2 ring-red-500' : ''} ${severityColors[severity]}`}>
+                            <p className="font-medium text-sm break-words">"{threat.text}"</p>
+                            <p className="text-xs mt-1 opacity-80">{threat.reason}</p>
                         </div>
-                      </div>
-                    );
-                  })}
-                </div>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <div className="text-center py-4 text-sm text-gray-500">No threats detected on this page.</div>
+                )}
               </div>
             )}
 
-            {analysisResult && currentPageThreats.length === 0 && (
-              <div className="text-center py-8">
-                <AlertTriangle className="w-12 h-12 text-green-500 mx-auto mb-2" />
-                <p className="text-green-600 font-medium">No threats detected on this page</p>
-              </div>
-            )}
-          </div>
+          </aside>
 
           {/* PDF Viewer */}
-          <div className="flex-1">
-            <div className="bg-white rounded-lg shadow-sm border">
+          <div className="flex-1 min-w-0">
+            <div className="bg-white rounded-lg shadow-sm border sticky top-24">
               {/* PDF Controls */}
-              {file && (
-                <div className="border-b p-4 flex items-center justify-between">
-                  <div className="flex items-center space-x-4">
-                    <span className="text-sm text-gray-600">Zoom:</span>
-                    <button
-                      onClick={() => setScale(Math.max(0.5, scale - 0.1))}
-                      className="px-2 py-1 bg-gray-200 text-gray-700 rounded text-sm"
-                    >
-                      -
-                    </button>
-                    <span className="text-sm text-gray-600 w-12 text-center">
-                      {Math.round(scale * 100)}%
-                    </span>
-                    <button
-                      onClick={() => setScale(Math.min(3, scale + 0.1))}
-                      className="px-2 py-1 bg-gray-200 text-gray-700 rounded text-sm"
-                    >
-                      +
-                    </button>
+              {fileUrl && (
+                <div className="border-b p-2 flex items-center justify-between flex-wrap gap-2">
+                  <div className="flex items-center space-x-2">
+                    <button onClick={() => setScale(s => Math.max(0.5, s - 0.1))} className="p-2 bg-gray-200 text-gray-700 rounded hover:bg-gray-300" title="Zoom Out"><ZoomOut className="w-4 h-4" /></button>
+                    <span className="text-sm text-gray-600 w-16 text-center font-mono">{Math.round(scale * 100)}%</span>
+                    <button onClick={() => setScale(s => Math.min(3, s + 0.1))} className="p-2 bg-gray-200 text-gray-700 rounded hover:bg-gray-300" title="Zoom In"><ZoomIn className="w-4 h-4" /></button>
                   </div>
                   
-                  {isRendering && (
-                    <div className="flex items-center space-x-2 text-sm text-gray-600">
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                      <span>Rendering...</span>
+                  {selectedText && (
+                    <div className="flex items-center space-x-2">
+                        <span className="text-sm text-gray-600 hidden md:inline">Highlight:</span>
+                        <button onClick={() => addHighlight('#FFDE5980')} className="px-3 py-1 bg-yellow-300 text-yellow-900 rounded text-sm hover:bg-yellow-400">Yellow</button>
+                        <button onClick={() => addHighlight('#90EE9080')} className="px-3 py-1 bg-green-300 text-green-900 rounded text-sm hover:bg-green-400">Green</button>
+                        <button onClick={() => addHighlight('#FFB6C180')} className="px-3 py-1 bg-pink-300 text-pink-900 rounded text-sm hover:bg-pink-400">Pink</button>
                     </div>
                   )}
                 </div>
               )}
 
-              {/* PDF Canvas Container */}
-              <div 
-                ref={containerRef}
-                className="relative overflow-auto max-h-[800px] bg-gray-100"
-              >
-                {file ? (
-                  <>
-                    <canvas 
-                      ref={canvasRef} 
-                      className="block mx-auto shadow-lg"
-                      style={{ maxWidth: '100%' }}
-                    />
+              {/* PDF Document Container */}
+              <div ref={containerRef} className="relative overflow-auto max-h-[calc(100vh-12rem)] bg-gray-100 flex justify-center p-4" onMouseUp={handleTextSelection}>
+                {fileUrl ? (
+                  <div className="relative" style={{ transform: `scale(${scale})`, transformOrigin: 'center top' }}>
+                    <Document file={fileUrl} onLoadSuccess={onDocumentLoadSuccess} onLoadError={onDocumentLoadError} loading={<Loader2 className="w-8 h-8 animate-spin text-gray-500 my-24" />}>
+                      <Page pageNumber={currentPage} scale={1} className="shadow-lg" />
+                    </Document>
                     
-                    {/* Threat Overlays */}
-                    {viewport && currentPageThreats.map((threat, index) => {
+                    {/* *************************************************************** */}
+                    {/* *** FIXED: Apply scale to user highlights during rendering  *** */}
+                    {/* *************************************************************** */}
+                    {currentPageHighlights.map((highlight) => (
+                      <div
+                        key={highlight.id}
+                        className="absolute pointer-events-none"
+                        style={{
+                          left: `${highlight.bbox.x * scale}px`,
+                          top: `${highlight.bbox.y * scale}px`,
+                          width: `${highlight.bbox.width * scale}px`,
+                          height: `${highlight.bbox.height * scale}px`,
+                          backgroundColor: highlight.color,
+                          zIndex: 5
+                        }}
+                        title={`Highlight: ${highlight.text}`}
+                      />
+                    ))}
+                    
+                    {/* Threat Overlays (already correctly scaled) */}
+                    {currentPageThreats.map((threat, index) => {
                       if (!threat.bbox) return null;
-                      
-                      const htmlCoords = convertPdfToHtmlCoords(threat.bbox);
-                      if (!htmlCoords) return null;
-                      
                       return (
                         <div
                           key={index}
-                          className={`absolute border-2 pointer-events-none transition-all ${
-                            selectedThreat === threat
-                              ? 'bg-red-500 bg-opacity-40 border-red-600 z-10'
-                              : 'bg-red-500 bg-opacity-20 border-red-500'
-                          }`}
+                          className={`absolute border-2 pointer-events-none transition-all ${selectedThreat === threat ? 'bg-red-500 bg-opacity-40 border-red-600 z-10' : 'bg-red-500 bg-opacity-20 border-red-500'}`}
                           style={{
-                            left: `${htmlCoords.x}px`,
-                            top: `${htmlCoords.y}px`,
-                            width: `${htmlCoords.width}px`,
-                            height: `${htmlCoords.height}px`,
+                            left: `${threat.bbox.x * scale}px`,
+                            top: `${threat.bbox.y * scale}px`,
+                            width: `${threat.bbox.width * scale}px`,
+                            height: `${threat.bbox.height * scale}px`,
                           }}
                           title={`${threat.text} - ${threat.reason}`}
                         />
                       );
                     })}
-                  </>
+                  </div>
                 ) : (
                   <div className="flex items-center justify-center h-96 text-gray-500">
                     <div className="text-center">
@@ -480,7 +391,7 @@ export default function PdfAnalyzer() {
             </div>
           </div>
         </div>
-      </div>
+      </main>
     </div>
   );
 }

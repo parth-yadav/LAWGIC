@@ -4,6 +4,10 @@ import { Document, Page, pdfjs } from 'react-pdf';
 import 'react-pdf/dist/Page/AnnotationLayer.css';
 import 'react-pdf/dist/Page/TextLayer.css';
 import { Upload, AlertTriangle, FileText, Loader2, Eye, ZoomIn, ZoomOut } from "lucide-react";
+import { useHighlights } from '../hooks/useHighlights';
+import { HighlightOverlay } from '../components/HighlightOverlay';
+import { HighlightControls } from '../components/HighlightControls';
+import { ThreatData } from '../types/highlight';
 
 // Configure PDF.js worker
 // Using dynamic import to ensure compatibility with different bundler configurations
@@ -11,34 +15,7 @@ if (typeof window !== 'undefined' && !pdfjs.GlobalWorkerOptions.workerSrc) {
   pdfjs.GlobalWorkerOptions.workerSrc = "/pdf.worker.min.js";
 }
 
-
 // --- TYPE DEFINITIONS ---
-interface ThreatData {
-  text: string;
-  reason: string;
-  bbox: {
-    x: number;
-    y: number;
-    width: number;
-    height: number;
-  } | null;
-  confidence: number;
-}
-
-interface HighlightData {
-  id: string;
-  text: string;
-  bbox: { // Bbox stores NORMALIZED coordinates (independent of scale)
-    x: number;
-    y: number;
-    width: number;
-    height: number;
-  };
-  page: number;
-  color: string;
-  note?: string;
-}
-
 interface PageData {
   page: number;
   threats: ThreatData[];
@@ -62,11 +39,20 @@ export default function PdfAnalyzer() {
   const [scale, setScale] = useState(1.2);
   const [selectedThreat, setSelectedThreat] = useState<ThreatData | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [highlights, setHighlights] = useState<HighlightData[]>([]);
-  const [selectedText, setSelectedText] = useState<string>('');
   const [isLoading, setIsLoading] = useState(false);
   
   const containerRef = useRef<HTMLDivElement>(null);
+  
+  // Use the modularized highlight hook
+  const {
+    selectedText,
+    addHighlight,
+    removeHighlight,
+    clearPageHighlights,
+    handleTextSelection,
+    getPageHighlights,
+    resetHighlights,
+  } = useHighlights();
 
   // Handle file selection and create URL
   function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
@@ -88,8 +74,7 @@ export default function PdfAnalyzer() {
       setError(null);
       setSelectedThreat(null);
       setCurrentPage(1);
-      setHighlights([]);
-      setSelectedText('');
+      resetHighlights();
       setTotalPages(0); // Reset total pages until new PDF is loaded
     }
   }
@@ -147,81 +132,17 @@ export default function PdfAnalyzer() {
     setIsLoading(false);
   }, []);
 
-  // --- Text Selection and Highlighting Logic ---
-  const handleTextSelection = useCallback(() => {
-    // Use a small timeout to allow the browser to finalize the selection
-    setTimeout(() => {
-      const selection = window.getSelection();
-      const text = selection?.toString().trim() || '';
-      setSelectedText(text);
-    }, 10);
-  }, []);
-
-  // ***************************************************************
-  // *** FIXED: Correctly calculate and normalize highlight bounds ***
-  // ***************************************************************
-  const addHighlight = useCallback((color: string = '#ffff00') => {
-    const selection = window.getSelection();
-    if (!selectedText || !selection || selection.rangeCount === 0 || !containerRef.current) {
-      return;
-    }
-
-    const range = selection.getRangeAt(0);
-    const selectionRect = range.getBoundingClientRect();
-    const containerRect = containerRef.current.getBoundingClientRect();
-    const scrollTop = containerRef.current.scrollTop;
-    const scrollLeft = containerRef.current.scrollLeft;
-
-    // Find the PDF page element to get its position and dimensions
-    const pdfPageElement = containerRef.current.querySelector('.react-pdf__Page');
-    if (!pdfPageElement) {
-      console.error('PDF page element not found');
-      return;
-    }
-
-    const pageRect = pdfPageElement.getBoundingClientRect();
-    const pageOffsetX = pageRect.left - containerRect.left + scrollLeft;
-    const pageOffsetY = pageRect.top - containerRect.top + scrollTop;
-
-    // Calculate position relative to the PDF page (not the container)
-    const relativeX = selectionRect.left - pageRect.left;
-    const relativeY = selectionRect.top - pageRect.top;
-
-    // Store coordinates normalized to scale=1 for consistency
-    const newHighlight: HighlightData = {
-      id: Date.now().toString(),
-      text: selectedText,
-      bbox: {
-        x: relativeX / scale,
-        y: relativeY / scale,
-        width: selectionRect.width / scale,
-        height: selectionRect.height / scale,
-      },
-      page: currentPage,
-      color: color,
-    };
-
-    setHighlights(prev => [...prev, newHighlight]);
-    setSelectedText(''); // Clear selection after adding highlight
-    selection.removeAllRanges();
-  }, [selectedText, currentPage, scale]);
-
-
-  const removeHighlight = useCallback((id: string) => {
-    setHighlights(prev => prev.filter(h => h.id !== id));
-  }, []);
-
-  const clearPageHighlights = useCallback(() => {
-    setHighlights(prev => prev.filter(h => h.page !== currentPage));
-  }, [currentPage]);
-
   // --- Data & Helper Functions ---
   const currentPageThreats = analysisResult?.pages.find(p => p.page === currentPage)?.threats || [];
-  const currentPageHighlights = highlights.filter(h => h.page === currentPage);
+  const currentPageHighlights = getPageHighlights(currentPage);
 
   const handleThreatClick = useCallback((threat: ThreatData) => {
     setSelectedThreat(threat);
   }, []);
+
+  const handleAddHighlight = useCallback((color: string) => {
+    addHighlight(currentPage, scale, containerRef, color);
+  }, [addHighlight, currentPage, scale]);
 
   const threatSeverity = useCallback((reason: string): 'high' | 'medium' | 'low' => {
     const highSeverity = ['injection', 'xss', 'command', 'malicious'];
@@ -334,14 +255,10 @@ export default function PdfAnalyzer() {
                     <button onClick={() => setScale(s => Math.min(3, s + 0.1))} className="p-2 bg-gray-200 text-gray-700 rounded hover:bg-gray-300" title="Zoom In"><ZoomIn className="w-4 h-4" /></button>
                   </div>
                   
-                  {selectedText && (
-                    <div className="flex items-center space-x-2">
-                        <span className="text-sm text-gray-600 hidden md:inline">Highlight:</span>
-                        <button onClick={() => addHighlight('#FFDE5980')} className="px-3 py-1 bg-yellow-300 text-yellow-900 rounded text-sm hover:bg-yellow-400">Yellow</button>
-                        <button onClick={() => addHighlight('#90EE9080')} className="px-3 py-1 bg-green-300 text-green-900 rounded text-sm hover:bg-green-400">Green</button>
-                        <button onClick={() => addHighlight('#FFB6C180')} className="px-3 py-1 bg-pink-300 text-pink-900 rounded text-sm hover:bg-pink-400">Pink</button>
-                    </div>
-                  )}
+                  <HighlightControls 
+                    selectedText={selectedText}
+                    onAddHighlight={handleAddHighlight}
+                  />
                 </div>
               )}
 
@@ -353,24 +270,11 @@ export default function PdfAnalyzer() {
                       <div className="relative" style={{ transform: `scale(${scale})`, transformOrigin: 'center top' }}>
                         <Page pageNumber={currentPage} scale={1} className="shadow-lg" />
                         
-                        {/* *************************************************************** */}
-                        {/* *** FIXED: User highlights positioned relative to PDF page  *** */}
-                        {/* *************************************************************** */}
-                        {currentPageHighlights.map((highlight) => (
-                          <div
-                            key={highlight.id}
-                            className="absolute pointer-events-none"
-                            style={{
-                              left: `${highlight.bbox.x}px`,
-                              top: `${highlight.bbox.y}px`,
-                              width: `${highlight.bbox.width}px`,
-                              height: `${highlight.bbox.height}px`,
-                              backgroundColor: highlight.color,
-                              zIndex: 5
-                            }}
-                            title={`Highlight: ${highlight.text}`}
-                          />
-                        ))}
+                        {/* User Highlights */}
+                        <HighlightOverlay 
+                          highlights={currentPageHighlights}
+                          onRemove={removeHighlight}
+                        />
                         
                         {/* Threat Overlays */}
                         {currentPageThreats.map((threat, index) => {

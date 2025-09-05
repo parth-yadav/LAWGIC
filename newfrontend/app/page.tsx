@@ -172,11 +172,22 @@ export default function PdfAnalyzer() {
     const scrollTop = containerRef.current.scrollTop;
     const scrollLeft = containerRef.current.scrollLeft;
 
-    // Calculate position relative to the scrollable container
-    const relativeX = selectionRect.left - containerRect.left + scrollLeft;
-    const relativeY = selectionRect.top - containerRect.top + scrollTop;
+    // Find the PDF page element to get its position and dimensions
+    const pdfPageElement = containerRef.current.querySelector('.react-pdf__Page');
+    if (!pdfPageElement) {
+      console.error('PDF page element not found');
+      return;
+    }
 
-    // Normalize coordinates by the current scale to make them independent of zoom level
+    const pageRect = pdfPageElement.getBoundingClientRect();
+    const pageOffsetX = pageRect.left - containerRect.left + scrollLeft;
+    const pageOffsetY = pageRect.top - containerRect.top + scrollTop;
+
+    // Calculate position relative to the PDF page (not the container)
+    const relativeX = selectionRect.left - pageRect.left;
+    const relativeY = selectionRect.top - pageRect.top;
+
+    // Store coordinates normalized to scale=1 for consistency
     const newHighlight: HighlightData = {
       id: Date.now().toString(),
       text: selectedText,
@@ -337,47 +348,49 @@ export default function PdfAnalyzer() {
               {/* PDF Document Container */}
               <div ref={containerRef} className="relative overflow-auto max-h-[calc(100vh-12rem)] bg-gray-100 flex justify-center p-4" onMouseUp={handleTextSelection}>
                 {fileUrl ? (
-                  <div className="relative" style={{ transform: `scale(${scale})`, transformOrigin: 'center top' }}>
+                  <div className="relative">
                     <Document file={fileUrl} onLoadSuccess={onDocumentLoadSuccess} onLoadError={onDocumentLoadError} loading={<Loader2 className="w-8 h-8 animate-spin text-gray-500 my-24" />}>
-                      <Page pageNumber={currentPage} scale={1} className="shadow-lg" />
+                      <div className="relative" style={{ transform: `scale(${scale})`, transformOrigin: 'center top' }}>
+                        <Page pageNumber={currentPage} scale={1} className="shadow-lg" />
+                        
+                        {/* *************************************************************** */}
+                        {/* *** FIXED: User highlights positioned relative to PDF page  *** */}
+                        {/* *************************************************************** */}
+                        {currentPageHighlights.map((highlight) => (
+                          <div
+                            key={highlight.id}
+                            className="absolute pointer-events-none"
+                            style={{
+                              left: `${highlight.bbox.x}px`,
+                              top: `${highlight.bbox.y}px`,
+                              width: `${highlight.bbox.width}px`,
+                              height: `${highlight.bbox.height}px`,
+                              backgroundColor: highlight.color,
+                              zIndex: 5
+                            }}
+                            title={`Highlight: ${highlight.text}`}
+                          />
+                        ))}
+                        
+                        {/* Threat Overlays */}
+                        {currentPageThreats.map((threat, index) => {
+                          if (!threat.bbox) return null;
+                          return (
+                            <div
+                              key={index}
+                              className={`absolute border-2 pointer-events-none transition-all ${selectedThreat === threat ? 'bg-red-500 bg-opacity-40 border-red-600 z-10' : 'bg-red-500 bg-opacity-20 border-red-500'}`}
+                              style={{
+                                left: `${threat.bbox.x}px`,
+                                top: `${threat.bbox.y}px`,
+                                width: `${threat.bbox.width}px`,
+                                height: `${threat.bbox.height}px`,
+                              }}
+                              title={`${threat.text} - ${threat.reason}`}
+                            />
+                          );
+                        })}
+                      </div>
                     </Document>
-                    
-                    {/* *************************************************************** */}
-                    {/* *** FIXED: Apply scale to user highlights during rendering  *** */}
-                    {/* *************************************************************** */}
-                    {currentPageHighlights.map((highlight) => (
-                      <div
-                        key={highlight.id}
-                        className="absolute pointer-events-none"
-                        style={{
-                          left: `${highlight.bbox.x * scale}px`,
-                          top: `${highlight.bbox.y * scale}px`,
-                          width: `${highlight.bbox.width * scale}px`,
-                          height: `${highlight.bbox.height * scale}px`,
-                          backgroundColor: highlight.color,
-                          zIndex: 5
-                        }}
-                        title={`Highlight: ${highlight.text}`}
-                      />
-                    ))}
-                    
-                    {/* Threat Overlays (already correctly scaled) */}
-                    {currentPageThreats.map((threat, index) => {
-                      if (!threat.bbox) return null;
-                      return (
-                        <div
-                          key={index}
-                          className={`absolute border-2 pointer-events-none transition-all ${selectedThreat === threat ? 'bg-red-500 bg-opacity-40 border-red-600 z-10' : 'bg-red-500 bg-opacity-20 border-red-500'}`}
-                          style={{
-                            left: `${threat.bbox.x * scale}px`,
-                            top: `${threat.bbox.y * scale}px`,
-                            width: `${threat.bbox.width * scale}px`,
-                            height: `${threat.bbox.height * scale}px`,
-                          }}
-                          title={`${threat.text} - ${threat.reason}`}
-                        />
-                      );
-                    })}
                   </div>
                 ) : (
                   <div className="flex items-center justify-center h-96 text-gray-500">

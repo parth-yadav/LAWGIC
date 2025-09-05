@@ -8,6 +8,7 @@ import { useHighlights } from '../hooks/useHighlights';
 import { HighlightOverlay } from '../components/HighlightOverlay';
 import { HighlightControls } from '../components/HighlightControls';
 import { ThreatData } from '../types/highlight';
+import { analyzeWithWordData } from '../utils/pdfAnalysis';
 
 // Configure PDF.js worker
 // Using dynamic import to ensure compatibility with different bundler configurations
@@ -88,7 +89,7 @@ export default function PdfAnalyzer() {
     };
   }, [fileUrl]);
 
-  // Upload and analyze PDF
+  // Upload and analyze PDF with word data
   async function handleUpload() {
     if (!file) return;
     
@@ -96,20 +97,8 @@ export default function PdfAnalyzer() {
     setError(null);
     
     try {
-      const formData = new FormData();
-      formData.append("pdf", file);
-
-      const response = await fetch("http://localhost:4000/analyze", {
-        method: "POST",
-        body: formData,
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || `Analysis failed: ${response.status}`);
-      }
-
-      const data = await response.json();
+      // Use the new function that extracts word data and sends it to backend
+      const data = await analyzeWithWordData(file);
       setAnalysisResult(data);
       setCurrentPage(1);
     } catch (err) {
@@ -227,9 +216,17 @@ export default function PdfAnalyzer() {
                         medium: 'bg-orange-50 border-orange-200 text-orange-800',
                         low: 'bg-yellow-50 border-yellow-200 text-yellow-800'
                       };
+                      
+                      const hasLocation = threat.bbox !== null;
+                      
                       return (
                         <div key={index} onClick={() => handleThreatClick(threat)} className={`p-3 border rounded-lg cursor-pointer transition-all hover:shadow-md ${selectedThreat === threat ? 'ring-2 ring-red-500' : ''} ${severityColors[severity]}`}>
-                            <p className="font-medium text-sm break-words">"{threat.text}"</p>
+                            <div className="flex items-start justify-between mb-1">
+                              <p className="font-medium text-sm break-words">"{threat.text}"</p>
+                              {!hasLocation && (
+                                <span className="text-xs bg-gray-200 text-gray-600 px-2 py-1 rounded ml-2 shrink-0">No location</span>
+                              )}
+                            </div>
                             <p className="text-xs mt-1 opacity-80">{threat.reason}</p>
                         </div>
                       );
@@ -270,29 +267,14 @@ export default function PdfAnalyzer() {
                       <div className="relative" style={{ transform: `scale(${scale})`, transformOrigin: 'center top' }}>
                         <Page pageNumber={currentPage} scale={1} className="shadow-lg" />
                         
-                        {/* User Highlights */}
+                        {/* Combined Highlights and Threats Overlay */}
                         <HighlightOverlay 
                           highlights={currentPageHighlights}
+                          threats={currentPageThreats}
+                          selectedThreat={selectedThreat}
                           onRemove={removeHighlight}
+                          onThreatClick={handleThreatClick}
                         />
-                        
-                        {/* Threat Overlays */}
-                        {currentPageThreats.map((threat, index) => {
-                          if (!threat.bbox) return null;
-                          return (
-                            <div
-                              key={index}
-                              className={`absolute border-2 pointer-events-none transition-all ${selectedThreat === threat ? 'bg-red-500 bg-opacity-40 border-red-600 z-10' : 'bg-red-500 bg-opacity-20 border-red-500'}`}
-                              style={{
-                                left: `${threat.bbox.x}px`,
-                                top: `${threat.bbox.y}px`,
-                                width: `${threat.bbox.width}px`,
-                                height: `${threat.bbox.height}px`,
-                              }}
-                              title={`${threat.text} - ${threat.reason}`}
-                            />
-                          );
-                        })}
                       </div>
                     </Document>
                   </div>

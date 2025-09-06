@@ -32,7 +32,7 @@ export function ThreatSidebar({
   onThreatClick,
   onPageChange 
 }: ThreatSidebarProps) {
-  const [activeTab, setActiveTab] = useState<number | null>(null);
+  const [activeTab, setActiveTab] = useState<number | 'overview'>('overview');
 
   if (!analysisResult) {
     return null;
@@ -48,9 +48,13 @@ export function ThreatSidebar({
   };
 
   const handlePageTabClick = (pageNumber: number) => {
-    setActiveTab(activeTab === pageNumber ? null : pageNumber);
+    setActiveTab(activeTab === pageNumber ? 'overview' : pageNumber);
     setCurrentPage(pageNumber);
     onPageChange(pageNumber);
+  };
+
+  const handleOverviewTabClick = () => {
+    setActiveTab('overview');
   };
 
   const handleThreatItemClick = (threat: ThreatData, pageNumber: number) => {
@@ -100,6 +104,26 @@ export function ThreatSidebar({
       {/* Page Tabs */}
       <div className="border-b bg-gray-50">
         <div className="flex overflow-x-auto scrollbar-hide">
+          {/* Overview Tab - Always present */}
+          <button
+            onClick={handleOverviewTabClick}
+            className={`
+              flex-shrink-0 px-4 py-3 text-sm font-medium border-b-2 transition-colors
+              ${activeTab === 'overview'
+                ? 'border-red-500 text-red-600 bg-white' 
+                : 'border-transparent text-gray-600 hover:text-gray-900 hover:bg-gray-100'
+              }
+            `}
+          >
+            <div className="flex items-center gap-2">
+              <span>All Threats Found</span>
+              <span className="px-2 py-1 text-xs rounded-full font-medium bg-red-500 text-white">
+                {analysisResult.totalThreats}
+              </span>
+            </div>
+          </button>
+
+          {/* Page Tabs */}
           {analysisResult.pages.map((pageData) => {
             const isActive = activeTab === pageData.page;
             const isCurrentPage = currentPage === pageData.page;
@@ -143,8 +167,96 @@ export function ThreatSidebar({
 
       {/* Threats Content */}
       <div className="max-h-[calc(100vh-16rem)] overflow-y-auto">
-        {activeTab !== null ? (
-          // Show threats for selected tab
+        {activeTab === 'overview' ? (
+          // Show overview of all threats
+          <div className="p-4">
+            <div className="mb-4">
+              <h4 className="text-md font-semibold text-gray-900 mb-3">
+                All Threats Overview ({analysisResult.totalThreats} total)
+              </h4>
+            </div>
+            
+            {/* Summary by severity */}
+            {(() => {
+              const allThreats = analysisResult.pages.flatMap(p => p.threats);
+              const severityCounts = {
+                high: allThreats.filter(t => threatSeverity(t.reason) === 'high').length,
+                medium: allThreats.filter(t => threatSeverity(t.reason) === 'medium').length,
+                low: allThreats.filter(t => threatSeverity(t.reason) === 'low').length,
+              };
+              
+              return (
+                <div className="space-y-3 mb-6">
+                  <h5 className="text-sm font-semibold text-gray-700">Threat Summary</h5>
+                  <div className="grid grid-cols-3 gap-3">
+                    <div className="bg-red-50 border border-red-200 rounded-lg p-3 text-center">
+                      <div className="text-lg font-bold text-red-600">{severityCounts.high}</div>
+                      <div className="text-xs text-red-700">High</div>
+                    </div>
+                    <div className="bg-orange-50 border border-orange-200 rounded-lg p-3 text-center">
+                      <div className="text-lg font-bold text-orange-600">{severityCounts.medium}</div>
+                      <div className="text-xs text-orange-700">Medium</div>
+                    </div>
+                    <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 text-center">
+                      <div className="text-lg font-bold text-yellow-600">{severityCounts.low}</div>
+                      <div className="text-xs text-yellow-700">Low</div>
+                    </div>
+                  </div>
+                </div>
+              );
+            })()}
+            
+            {/* All threats from all pages */}
+            <div className="space-y-3">
+              <h5 className="text-sm font-semibold text-gray-700">All Threats</h5>
+              {analysisResult.pages.flatMap(pageData => 
+                pageData.threats.map((threat, threatIndex) => {
+                  const severity = threatSeverity(threat.reason);
+                  const hasLocation = threat.bbox !== null;
+                  const isSelected = selectedThreat === threat;
+                  
+                  return (
+                    <div
+                      key={`${pageData.page}-${threatIndex}`}
+                      onClick={() => handleThreatItemClick(threat, pageData.page)}
+                      className={`
+                        p-3 border rounded-lg cursor-pointer transition-all hover:shadow-md
+                        ${isSelected ? 'ring-2 ring-red-500' : ''}
+                        ${getSeverityColor(severity)}
+                      `}
+                    >
+                      <div className="flex items-start justify-between mb-2">
+                        <div className="flex items-center gap-2">
+                          <span className={`
+                            px-2 py-1 text-xs font-medium rounded-full
+                            ${getSeverityBadgeColor(severity)}
+                          `}>
+                            {severity.toUpperCase()}
+                          </span>
+                          <span className="text-xs bg-blue-500 text-white px-2 py-1 rounded">
+                            Page {pageData.page}
+                          </span>
+                          {!hasLocation && (
+                            <span className="text-xs bg-gray-200 text-gray-600 px-2 py-1 rounded">
+                              No location
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                      <p className="font-medium text-sm break-words mb-1">
+                        "{threat.text}"
+                      </p>
+                      <p className="text-xs opacity-80">
+                        {threat.reason}
+                      </p>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+          </div>
+        ) : (
+          // Show threats for selected page
           <div className="p-4">
             <div className="mb-3">
               <h4 className="text-md font-semibold text-gray-900">
@@ -175,7 +287,7 @@ export function ThreatSidebar({
                     return (
                       <div
                         key={index}
-                        onClick={() => handleThreatItemClick(threat, activeTab)}
+                        onClick={() => handleThreatItemClick(threat, activeTab as number)}
                         className={`
                           p-3 border rounded-lg cursor-pointer transition-all hover:shadow-md
                           ${isSelected ? 'ring-2 ring-red-500' : ''}
@@ -209,78 +321,6 @@ export function ThreatSidebar({
                 </div>
               );
             })()}
-          </div>
-        ) : (
-          // Show overview of all pages
-          <div className="p-4">
-            <div className="mb-4">
-              <p className="text-sm text-gray-600 mb-4">
-                Click on a page tab above to view threats for that specific page.
-              </p>
-            </div>
-            
-            {/* Summary by severity */}
-            {(() => {
-              const allThreats = analysisResult.pages.flatMap(p => p.threats);
-              const severityCounts = {
-                high: allThreats.filter(t => threatSeverity(t.reason) === 'high').length,
-                medium: allThreats.filter(t => threatSeverity(t.reason) === 'medium').length,
-                low: allThreats.filter(t => threatSeverity(t.reason) === 'low').length,
-              };
-              
-              return (
-                <div className="space-y-3 mb-6">
-                  <h4 className="text-sm font-semibold text-gray-700">Threat Summary</h4>
-                  <div className="grid grid-cols-3 gap-3">
-                    <div className="bg-red-50 border border-red-200 rounded-lg p-3 text-center">
-                      <div className="text-lg font-bold text-red-600">{severityCounts.high}</div>
-                      <div className="text-xs text-red-700">High</div>
-                    </div>
-                    <div className="bg-orange-50 border border-orange-200 rounded-lg p-3 text-center">
-                      <div className="text-lg font-bold text-orange-600">{severityCounts.medium}</div>
-                      <div className="text-xs text-orange-700">Medium</div>
-                    </div>
-                    <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 text-center">
-                      <div className="text-lg font-bold text-yellow-600">{severityCounts.low}</div>
-                      <div className="text-xs text-yellow-700">Low</div>
-                    </div>
-                  </div>
-                </div>
-              );
-            })()}
-            
-            {/* Pages overview */}
-            <div className="space-y-2">
-              <h4 className="text-sm font-semibold text-gray-700">Pages Overview</h4>
-              {analysisResult.pages.map((pageData) => (
-                <button
-                  key={pageData.page}
-                  onClick={() => handlePageTabClick(pageData.page)}
-                  className="w-full p-3 border rounded-lg hover:bg-gray-50 transition-colors text-left"
-                >
-                  <div className="flex items-center justify-between">
-                    <span className="font-medium text-sm">Page {pageData.page}</span>
-                    <div className="flex items-center gap-2">
-                      {pageData.threats.length > 0 ? (
-                        <span className="px-2 py-1 bg-red-500 text-white text-xs rounded-full">
-                          {pageData.threats.length} threats
-                        </span>
-                      ) : (
-                        <span className="px-2 py-1 bg-green-500 text-white text-xs rounded-full">
-                          Clean
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                  {pageData.threats.length > 0 && (
-                    <div className="text-xs text-gray-600 mt-1">
-                      {pageData.threats.slice(0, 2).map(t => `"${t.text}"`).join(', ')}
-                      {pageData.threats.length > 2 && ` +${pageData.threats.length - 2} more`}
-                    </div>
-                  )}
-                </button>
-              ))}
-            </div>
           </div>
         )}
       </div>

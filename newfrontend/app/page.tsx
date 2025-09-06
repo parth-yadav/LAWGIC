@@ -224,35 +224,23 @@ export default function PdfAnalyzer() {
               </div>
             )}
 
-            {/* Current Page Threats Quick View */}
+            {/* Current Page Quick Info */}
             {analysisResult && (
               <div>
-                <h3 className="text-lg font-semibold text-gray-900 mb-3">Current Page Threats ({currentPageThreats.length})</h3>
-                {currentPageThreats.length > 0 ? (
-                  <div className="space-y-2 max-h-48 overflow-y-auto pr-2">
-                    {currentPageThreats.slice(0, 3).map((threat, index) => {
-                      const severity = threatSeverity(threat.reason);
-                      const severityColors = {
-                        high: 'bg-red-50 border-red-200 text-red-800',
-                        medium: 'bg-orange-50 border-orange-200 text-orange-800',
-                        low: 'bg-yellow-50 border-yellow-200 text-yellow-800'
-                      };
-                      
-                      return (
-                        <div key={index} onClick={() => handleThreatClick(threat)} className={`p-2 border rounded cursor-pointer transition-all hover:shadow-sm text-xs ${selectedThreat === threat ? 'ring-2 ring-red-500' : ''} ${severityColors[severity]}`}>
-                          <p className="font-medium break-words">"{threat.text}"</p>
-                        </div>
-                      );
-                    })}
-                    {currentPageThreats.length > 3 && (
-                      <div className="text-xs text-gray-500 text-center py-1">
-                        +{currentPageThreats.length - 3} more threats
-                      </div>
-                    )}
+                <h3 className="text-lg font-semibold text-gray-900 mb-3">Current Page ({currentPage})</h3>
+                <div className="bg-gray-50 rounded-lg p-3 text-sm">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-gray-600">Threats found:</span>
+                    <span className={`font-semibold ${currentPageThreats.length > 0 ? 'text-red-600' : 'text-green-600'}`}>
+                      {currentPageThreats.length}
+                    </span>
                   </div>
-                ) : (
-                  <div className="text-center py-4 text-sm text-gray-500">No threats detected on this page.</div>
-                )}
+                  {currentPageThreats.length > 0 && (
+                    <div className="text-xs text-gray-500">
+                      Click threats in the sidebar to highlight them on the PDF.
+                    </div>
+                  )}
+                </div>
               </div>
             )}
           </aside>

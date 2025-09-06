@@ -4,7 +4,6 @@ import fs from "fs";
 import path from "path";
 import cors from "cors";
 import dotenv from "dotenv";
-import { getDocument } from "pdfjs-dist/legacy/build/pdf.mjs";
 import { GoogleGenerativeAI } from "@google/generative-ai";
 
 dotenv.config();
@@ -25,54 +24,8 @@ if (!fs.existsSync('uploads')) {
   fs.mkdirSync('uploads');
 }
 
-// Extract text content with bounding boxes from a PDF page
-async function extractPageData(page) {
-  const textContent = await page.getTextContent();
-  const viewport = page.getViewport({ scale: 1.0 });
-  
-  console.log(`📄 Page viewport: ${viewport.width}x${viewport.height}`);
-  console.log(`📄 Raw text items found: ${textContent.items.length}`);
-  
-  const words = textContent.items.map((item, index) => {
-    // PDF.js provides transform matrix: [scaleX, skewX, skewY, scaleY, translateX, translateY]
-    const transform = item.transform;
-    
-    // Calculate proper coordinates accounting for PDF coordinate system
-    const x = transform[4];
-    const y = viewport.height - transform[5] - item.height; // Flip Y coordinate
-    
-    const word = {
-      text: item.str.trim(),
-      bbox: {
-        x: x,
-        y: y,
-        width: item.width,
-        height: item.height,
-      },
-      originalIndex: index
-    };
-    
-    return word;
-  }).filter(item => item.text.length > 0); // Filter out empty strings
-  
-  // Sort words by visual reading order: top-to-bottom, then left-to-right
-  // Group words by lines (similar Y coordinates) then sort by X within each line
-  const sortedWords = words.sort((a, b) => {
-    const yDiff = b.bbox.y - a.bbox.y; // Higher Y first (top of page)
-    if (Math.abs(yDiff) > 5) { // Words on different lines (5px tolerance)
-      return yDiff;
-    }
-    return a.bbox.x - b.bbox.x; // Same line, sort left to right
-  });
-  
-  // Log first few items for debugging
-  sortedWords.slice(0, 5).forEach((word, index) => {
-    console.log(`📝 Sorted Item ${index}: "${word.text}" at (${word.bbox.x.toFixed(1)}, ${word.bbox.y.toFixed(1)}) [was index ${word.originalIndex}]`);
-  });
-  
-  console.log(`✅ Filtered and sorted ${sortedWords.length} non-empty words`);
-  return sortedWords.map(word => ({ text: word.text, bbox: word.bbox })); // Remove originalIndex from final result
-}
+// No longer needed - frontend handles word extraction
+// This function has been removed as we only use frontend word data
 
 // Analyze text for security threats using Gemini
 async function analyzeThreats(pageText, pageNumber) {
@@ -213,43 +166,71 @@ function levenshteinDistance(str1, str2) {
   return matrix[str2.length][str1.length];
 }
 
-// Main analysis endpoint - now accepts word data from frontend
+// Main analysis endpoint - only uses word data from frontend
 app.post("/analyze", upload.single("pdf"), async (req, res) => {
   try {
+    console.log('📥 BACKEND: Received analysis request');
+    console.log('📥 BACKEND: Request file info:', req.file ? {
+      fieldname: req.file.fieldname,
+      originalname: req.file.originalname,
+      mimetype: req.file.mimetype,
+      size: req.file.size,
+      filename: req.file.filename,
+      path: req.file.path
+    } : 'No file received');
+    
+    console.log('📥 BACKEND: Request body keys:', Object.keys(req.body));
+    console.log('📥 BACKEND: Words data present:', !!req.body.wordsData);
+    
     if (!req.file) {
+      console.log('❌ BACKEND: No PDF file uploaded');
       return res.status(400).json({ error: "No PDF file uploaded" });
     }
 
-    // Check if frontend sent word data
-    const frontendWordsData = req.body.wordsData ? JSON.parse(req.body.wordsData) : null;
+    // Require word data from frontend
+    if (!req.body.wordsData) {
+      console.log('❌ BACKEND: No word data from frontend');
+      return res.status(400).json({ error: "Word data from frontend is required" });
+    }
+
+    console.log('📥 BACKEND: Words data string length:', req.body.wordsData.length);
+    const frontendWordsData = JSON.parse(req.body.wordsData);
+    
+    console.log('📥 BACKEND: Parsed words data:');
+    console.log('📥 BACKEND: Pages with word data:', Object.keys(frontendWordsData));
+    
+    // Log details for each page
+    Object.entries(frontendWordsData).forEach(([pageNum, words]) => {
+      console.log(`📥 BACKEND: Page ${pageNum} - received ${words.length} words`);
+      if (words.length > 0) {
+        console.log(`📥 BACKEND: Page ${pageNum} first 3 words:`, words.slice(0, 3).map(w => ({ text: w.text, bbox: w.bbox })));
+      }
+    });
     
     const pdfPath = path.join(process.cwd(), req.file.path);
-    const pdfData = new Uint8Array(fs.readFileSync(pdfPath));
-    
-    // Load PDF document
-    const loadingTask = getDocument({ data: pdfData });
-    const pdf = await loadingTask.promise;
+    console.log('📥 BACKEND: PDF saved to:', pdfPath);
 
     let allPages = [];
 
-    // Process each page
-    for (let i = 1; i <= pdf.numPages; i++) {
-      let words = [];
-      let pageText = "";
-
-      if (frontendWordsData && frontendWordsData[i]) {
-        // Use words data from frontend (correct visual order)
-        words = frontendWordsData[i];
-        pageText = words.map(w => w.text).join(" ");
-        console.log(`📱 Using frontend word data for page ${i} (${words.length} words)`);
-        console.log('📝 First 10 words from frontend:', words.slice(0, 10).map((w, idx) => `${idx}: "${w.text}"`));
-      } else {
-        // Fallback to backend extraction (old method)
-        const page = await pdf.getPage(i);
-        words = await extractPageData(page);
-        pageText = words.map(w => w.text).join(" ");
-        console.log(`🔧 Using backend extraction for page ${i} (${words.length} words)`);
+    // Process each page using only frontend data
+    for (let i = 1; i <= Object.keys(frontendWordsData).length; i++) {
+      console.log(`\n🔄 BACKEND: Processing page ${i}`);
+      
+      if (!frontendWordsData[i]) {
+        console.log(`⚠ BACKEND: No word data for page ${i}, skipping`);
+        allPages.push({ page: i, threats: [] });
+        continue;
       }
+
+      // Use words data from frontend (correct visual order)
+      const words = frontendWordsData[i];
+      const pageText = words.map(w => w.text).join(" ");
+      
+      console.log(`📱 BACKEND: Using frontend word data for page ${i}:`);
+      console.log(`📱 BACKEND: - Total words: ${words.length}`);
+      console.log(`📱 BACKEND: - Page text length: ${pageText.length} characters`);
+      console.log(`� BACKEND: - First 10 words:`, words.slice(0, 10).map((w, idx) => `${idx}: "${w.text}"`));
+      console.log(`📱 BACKEND: - Sample bounding boxes:`, words.slice(0, 3).map(w => ({ text: w.text, bbox: w.bbox })));
 
       if (pageText.trim().length === 0) {
         allPages.push({ page: i, threats: [] });
@@ -318,12 +299,25 @@ app.post("/analyze", upload.single("pdf"), async (req, res) => {
     // Clean up uploaded file
     fs.unlinkSync(pdfPath);
 
-    console.log(`Analysis complete. Processed ${pdf.numPages} pages.`);
-    res.json({ 
-      pages: allPages,
-      totalPages: pdf.numPages,
-      totalThreats: allPages.reduce((sum, page) => sum + page.threats.length, 0)
+    console.log(`\n✅ BACKEND: Analysis complete. Processed ${allPages.length} pages.`);
+    console.log(`✅ BACKEND: Total threats found: ${allPages.reduce((sum, page) => sum + page.threats.length, 0)}`);
+    
+    // Log summary of each page's results
+    allPages.forEach(page => {
+      console.log(`✅ BACKEND: Page ${page.page} - ${page.threats.length} threats, ${page.totalWords || 0} words`);
+      if (page.threats.length > 0) {
+        console.log(`✅ BACKEND: Page ${page.page} threats:`, page.threats.map(t => ({ text: t.text, reason: t.reason, hasBbox: !!t.bbox })));
+      }
     });
+    
+    const responseData = { 
+      pages: allPages,
+      totalPages: allPages.length,
+      totalThreats: allPages.reduce((sum, page) => sum + page.threats.length, 0)
+    };
+    
+    console.log(`📤 BACKEND: Sending response with ${responseData.pages.length} pages, ${responseData.totalThreats} total threats`);
+    res.json(responseData);
 
   } catch (error) {
     console.error("Analysis error:", error);

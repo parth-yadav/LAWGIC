@@ -7,6 +7,7 @@ import { Upload, AlertTriangle, FileText, Loader2, Eye, ZoomIn, ZoomOut } from "
 import { useHighlights } from '../hooks/useHighlights';
 import { HighlightOverlay } from '../components/HighlightOverlay';
 import { HighlightControls } from '../components/HighlightControls';
+import { ThreatSidebar } from '../components/ThreatSidebar';
 import { ThreatData } from '../types/highlight';
 import { analyzeWithWordData } from '../utils/pdfAnalysis';
 
@@ -41,6 +42,7 @@ export default function PdfAnalyzer() {
   const [selectedThreat, setSelectedThreat] = useState<ThreatData | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   
   const containerRef = useRef<HTMLDivElement>(null);
   
@@ -91,20 +93,35 @@ export default function PdfAnalyzer() {
 
   // Upload and analyze PDF with word data
   async function handleUpload() {
-    if (!file) return;
+    if (!file) {
+      console.log('⚠️ FRONTEND: No file selected for upload');
+      return;
+    }
+    
+    console.log('🚀 FRONTEND: Starting PDF analysis process');
+    console.log('🚀 FRONTEND: File details:', {
+      name: file.name,
+      size: file.size,
+      type: file.type,
+      lastModified: new Date(file.lastModified).toISOString()
+    });
     
     setIsAnalyzing(true);
     setError(null);
     
     try {
       // Use the new function that extracts word data and sends it to backend
+      console.log('🔄 FRONTEND: Calling analyzeWithWordData...');
       const data = await analyzeWithWordData(file);
+      
+      console.log('🎉 FRONTEND: Analysis successful, setting results');
       setAnalysisResult(data);
       setCurrentPage(1);
     } catch (err) {
+      console.error("❌ FRONTEND: Analysis error:", err);
       setError(err instanceof Error ? err.message : "An unknown error occurred during analysis.");
-      console.error("Analysis error:", err);
     } finally {
+      console.log('🏁 FRONTEND: Analysis process completed');
       setIsAnalyzing(false);
     }
   }
@@ -127,6 +144,10 @@ export default function PdfAnalyzer() {
 
   const handleThreatClick = useCallback((threat: ThreatData) => {
     setSelectedThreat(threat);
+  }, []);
+
+  const handlePageChange = useCallback((page: number) => {
+    setCurrentPage(page);
   }, []);
 
   const handleAddHighlight = useCallback((color: string) => {
@@ -162,10 +183,10 @@ export default function PdfAnalyzer() {
         </div>
       </header>
 
-      <main className="max-w-7xl mx-auto px-4 py-6">
-        <div className="flex flex-col lg:flex-row gap-6">
-          {/* Sidebar */}
-          <aside className="w-full lg:w-96 bg-white rounded-lg shadow-sm border p-6 self-start">
+      <main className="max-w-full mx-auto px-4 py-6">
+        <div className="flex gap-6">
+          {/* Left Sidebar - File Upload */}
+          <aside className="w-80 bg-white rounded-lg shadow-sm border p-6 self-start">
             {/* File Upload */}
             <div className="mb-6">
               <label className="block text-sm font-medium text-gray-700 mb-2">Upload PDF Document</label>
@@ -203,13 +224,13 @@ export default function PdfAnalyzer() {
               </div>
             )}
 
-            {/* Threats List */}
+            {/* Current Page Threats Quick View */}
             {analysisResult && (
               <div>
-                <h3 className="text-lg font-semibold text-gray-900 mb-3">Threats on Page {currentPage} ({currentPageThreats.length})</h3>
+                <h3 className="text-lg font-semibold text-gray-900 mb-3">Current Page Threats ({currentPageThreats.length})</h3>
                 {currentPageThreats.length > 0 ? (
-                  <div className="space-y-3 max-h-[28rem] overflow-y-auto pr-2">
-                    {currentPageThreats.map((threat, index) => {
+                  <div className="space-y-2 max-h-48 overflow-y-auto pr-2">
+                    {currentPageThreats.slice(0, 3).map((threat, index) => {
                       const severity = threatSeverity(threat.reason);
                       const severityColors = {
                         high: 'bg-red-50 border-red-200 text-red-800',
@@ -217,27 +238,23 @@ export default function PdfAnalyzer() {
                         low: 'bg-yellow-50 border-yellow-200 text-yellow-800'
                       };
                       
-                      const hasLocation = threat.bbox !== null;
-                      
                       return (
-                        <div key={index} onClick={() => handleThreatClick(threat)} className={`p-3 border rounded-lg cursor-pointer transition-all hover:shadow-md ${selectedThreat === threat ? 'ring-2 ring-red-500' : ''} ${severityColors[severity]}`}>
-                            <div className="flex items-start justify-between mb-1">
-                              <p className="font-medium text-sm break-words">"{threat.text}"</p>
-                              {!hasLocation && (
-                                <span className="text-xs bg-gray-200 text-gray-600 px-2 py-1 rounded ml-2 shrink-0">No location</span>
-                              )}
-                            </div>
-                            <p className="text-xs mt-1 opacity-80">{threat.reason}</p>
+                        <div key={index} onClick={() => handleThreatClick(threat)} className={`p-2 border rounded cursor-pointer transition-all hover:shadow-sm text-xs ${selectedThreat === threat ? 'ring-2 ring-red-500' : ''} ${severityColors[severity]}`}>
+                          <p className="font-medium break-words">"{threat.text}"</p>
                         </div>
                       );
                     })}
+                    {currentPageThreats.length > 3 && (
+                      <div className="text-xs text-gray-500 text-center py-1">
+                        +{currentPageThreats.length - 3} more threats
+                      </div>
+                    )}
                   </div>
                 ) : (
                   <div className="text-center py-4 text-sm text-gray-500">No threats detected on this page.</div>
                 )}
               </div>
             )}
-
           </aside>
 
           {/* PDF Viewer */}
@@ -289,6 +306,20 @@ export default function PdfAnalyzer() {
               </div>
             </div>
           </div>
+
+          {/* Right Sidebar - All Threats */}
+          {analysisResult && (
+            <aside className="w-96">
+              <ThreatSidebar
+                analysisResult={analysisResult}
+                currentPage={currentPage}
+                setCurrentPage={setCurrentPage}
+                selectedThreat={selectedThreat}
+                onThreatClick={handleThreatClick}
+                onPageChange={handlePageChange}
+              />
+            </aside>
+          )}
         </div>
       </main>
     </div>

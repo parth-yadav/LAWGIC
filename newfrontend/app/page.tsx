@@ -3,13 +3,14 @@ import { useState, useRef, useEffect, useCallback } from "react";
 import { Document, Page, pdfjs } from 'react-pdf';
 import 'react-pdf/dist/Page/AnnotationLayer.css';
 import 'react-pdf/dist/Page/TextLayer.css';
-import { Upload, AlertTriangle, FileText, Loader2, Eye, ZoomIn, ZoomOut } from "lucide-react";
+import { Upload, AlertTriangle, FileText, Loader2, Eye, ZoomIn, ZoomOut, Download } from "lucide-react";
 import { useHighlights } from '../hooks/useHighlights';
 import { HighlightOverlay } from '../components/HighlightOverlay';
 import { HighlightControls } from '../components/HighlightControls';
 import { ThreatSidebar } from '../components/ThreatSidebar';
 import { ThreatData } from '../types/highlight';
 import { analyzeWithWordData } from '../utils/pdfAnalysis';
+import { generateThreatsPDF } from '../utils/pdfGenerator';
 
 // Configure PDF.js worker
 // Using dynamic import to ensure compatibility with different bundler configurations
@@ -29,7 +30,6 @@ interface AnalysisResult {
   totalPages: number;
   totalThreats: number;
 }
-
 
 export default function PdfAnalyzer() {
   const [file, setFile] = useState<File | null>(null);
@@ -118,15 +118,30 @@ export default function PdfAnalyzer() {
       setAnalysisResult(data);
       setCurrentPage(1);
     } catch (err) {
-      console.error("❌ FRONTEND: Analysis error:", err);
-      setError(err instanceof Error ? err.message : "An unknown error occurred during analysis.");
+      console.error(' FRONTEND: Upload failed:', err);
+      setError(err instanceof Error ? err.message : 'Upload failed');
     } finally {
-      console.log('🏁 FRONTEND: Analysis process completed');
       setIsAnalyzing(false);
     }
   }
 
-  // --- react-pdf Event Handlers ---
+  const handleDownloadThreats = useCallback(() => {
+    if (!analysisResult || !file) {
+      console.log('No analysis result or file available for download');
+      return;
+    }
+    
+    try {
+      console.log(' Generating threats PDF...');
+      generateThreatsPDF(analysisResult, file.name);
+      console.log(' PDF generated and download started');
+    } catch (error) {
+      console.error(' Error generating PDF:', error);
+      setError('Failed to generate PDF report');
+    }
+  }, [analysisResult, file]);
+
+  //in-built react-pdf fxn, dont touch!
   const onDocumentLoadSuccess = useCallback(({ numPages }: { numPages: number }) => {
     setTotalPages(numPages);
     setIsLoading(false);
@@ -138,7 +153,7 @@ export default function PdfAnalyzer() {
     setIsLoading(false);
   }, []);
 
-  // --- Data & Helper Functions ---
+  // helpers
   const currentPageThreats = analysisResult?.pages.find(p => p.page === currentPage)?.threats || [];
   const currentPageHighlights = getPageHighlights(currentPage);
 
@@ -201,34 +216,44 @@ export default function PdfAnalyzer() {
               </div>
               
               {file && (
-                <button onClick={handleUpload} disabled={isAnalyzing} className="w-full mt-3 bg-red-600 text-white py-2 px-4 rounded-lg hover:bg-red-700 disabled:bg-gray-400 disabled:cursor-not-allowed flex items-center justify-center space-x-2">
-                  {isAnalyzing ? (<><Loader2 className="w-4 h-4 animate-spin" /><span>Analyzing...</span></>) : (<><Eye className="w-4 h-4" /><span>Analyze Threats</span></>)}
-                </button>
+                <div className="space-y-3 mt-3">
+                  <button onClick={handleUpload} disabled={isAnalyzing} className="w-full bg-red-600 text-white py-2 px-4 rounded-lg hover:bg-red-700 disabled:bg-gray-400 disabled:cursor-not-allowed flex items-center justify-center space-x-2">
+                    {isAnalyzing ? (
+                      <>
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        <span>Analyzing...</span>
+                      </>
+                    ) : (
+                      <>
+                        <AlertTriangle className="w-4 h-4" />
+                        <span>Detect Threats</span>
+                      </>
+                    )}
+                  </button>
+                  <button 
+                    onClick={handleDownloadThreats}
+                    disabled={!analysisResult || isAnalyzing}
+                    className="w-full bg-blue-600 text-white py-2 px-4 rounded-lg hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed flex items-center justify-center space-x-2"
+                  >
+                    <Download className="w-4 h-4" />
+                    <span>Download Threats Report</span>
+                  </button>
+                </div>
               )}
             </div>
 
-            {/* Error Message */}
+            {/* Error Display */}
             {error && (
-              <div className="mb-6 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">{error}</div>
-            )}
-
-            {/* Page Navigation */}
-            {totalPages > 0 && (
-              <div className="mb-6">
-                <label className="block text-sm font-medium text-gray-700 mb-2">Page Navigation</label>
-                <div className="flex items-center justify-center space-x-2">
-                  <button onClick={() => setCurrentPage(p => Math.max(1, p - 1))} disabled={currentPage === 1} className="px-3 py-1 bg-gray-200 text-gray-700 rounded disabled:opacity-50">←</button>
-                  <span className="text-sm text-gray-600 font-mono px-3"> {currentPage} / {totalPages} </span>
-                  <button onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))} disabled={currentPage === totalPages} className="px-3 py-1 bg-gray-200 text-gray-700 rounded disabled:opacity-50">→</button>
-                </div>
+              <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg">
+                <p className="text-sm text-red-600">{error}</p>
               </div>
             )}
 
-            {/* Current Page Quick Info */}
+            {/* Analysis Results Summary */}
             {analysisResult && (
-              <div>
-                <h3 className="text-lg font-semibold text-gray-900 mb-3">Current Page ({currentPage})</h3>
-                <div className="bg-gray-50 rounded-lg p-3 text-sm">
+              <div className="bg-gray-50 rounded-lg p-4">
+                <h3 className="text-sm font-semibold text-gray-700 mb-3">Current Page Analysis</h3>
+                <div className="space-y-2">
                   <div className="flex items-center justify-between mb-2">
                     <span className="text-gray-600">Threats found:</span>
                     <span className={`font-semibold ${currentPageThreats.length > 0 ? 'text-red-600' : 'text-green-600'}`}>
@@ -252,19 +277,28 @@ export default function PdfAnalyzer() {
               {fileUrl && (
                 <div className="border-b p-2 flex items-center justify-between flex-wrap gap-2">
                   <div className="flex items-center space-x-2">
-                    <button onClick={() => setScale(s => Math.max(0.5, s - 0.1))} className="p-2 bg-gray-200 text-gray-700 rounded hover:bg-gray-300" title="Zoom Out"><ZoomOut className="w-4 h-4" /></button>
-                    <span className="text-sm text-gray-600 w-16 text-center font-mono">{Math.round(scale * 100)}%</span>
-                    <button onClick={() => setScale(s => Math.min(3, s + 0.1))} className="p-2 bg-gray-200 text-gray-700 rounded hover:bg-gray-300" title="Zoom In"><ZoomIn className="w-4 h-4" /></button>
+                    <button onClick={() => setCurrentPage(Math.max(1, currentPage - 1))} disabled={currentPage <= 1} className="p-1 text-gray-600 hover:text-gray-900 disabled:text-gray-400">
+                      ←
+                    </button>
+                    <span className="text-sm text-gray-700">
+                      Page {currentPage} of {totalPages}
+                    </span>
+                    <button onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))} disabled={currentPage >= totalPages} className="p-1 text-gray-600 hover:text-gray-900 disabled:text-gray-400">
+                      →
+                    </button>
                   </div>
-                  
-                  <HighlightControls 
-                    selectedText={selectedText}
-                    onAddHighlight={handleAddHighlight}
-                  />
+                  <div className="flex items-center space-x-2">
+                    <button onClick={() => setScale(Math.max(0.5, scale - 0.1))} className="p-1 text-gray-600 hover:text-gray-900">
+                      <ZoomOut className="w-4 h-4" />
+                    </button>
+                    <span className="text-sm text-gray-700 min-w-[3rem] text-center">{Math.round(scale * 100)}%</span>
+                    <button onClick={() => setScale(Math.min(3, scale + 0.1))} className="p-1 text-gray-600 hover:text-gray-900">
+                      <ZoomIn className="w-4 h-4" />
+                    </button>
+                  </div>
                 </div>
               )}
 
-              {/* PDF Document Container */}
               <div ref={containerRef} className="relative overflow-auto max-h-[calc(100vh-12rem)] bg-gray-100 flex justify-center p-4" onMouseUp={handleTextSelection}>
                 {fileUrl ? (
                   <div className="relative">

@@ -15,6 +15,8 @@ import React, {
 } from "react";
 import { LoaderCircleIcon } from "lucide-react";
 import useLocalState from "@/hooks/useLocalState";
+import { Highlight } from "./highlight/types";
+import { removeHighlight } from "./highlight/utils";
 
 type PDFContextType = {
   pdfUrl: string;
@@ -37,6 +39,9 @@ type PDFContextType = {
   isScrolling: boolean;
   isContentVisible: boolean;
   setIsContentVisible: React.Dispatch<React.SetStateAction<boolean>>;
+  currentContent: "highlights" | null;
+  setCurrentContent: React.Dispatch<React.SetStateAction<"highlights" | null>>;
+  toggleHighlightsTab: () => void;
   toolbarPosition: "top" | "bottom";
   setToolbarPosition: React.Dispatch<React.SetStateAction<"top" | "bottom">>;
   onLoadSuccess: ({ numPages }: { numPages: number }) => void;
@@ -59,6 +64,12 @@ type PDFContextType = {
   validateAndNavigateToPage: (value: string) => boolean;
   validateAndSetZoom: (value: string) => boolean;
   onSelection: (args: { selectedText: string; currentPage: number }) => void;
+  closeContentTab: () => void;
+
+  highlights: Highlight[];
+  setHighlights: React.Dispatch<React.SetStateAction<Highlight[]>>;
+  removeHighlightById: (highlightId: string) => void;
+  clearAllHighlights: () => void;
 };
 
 const PDFContext = createContext<PDFContextType | undefined>(undefined);
@@ -85,9 +96,16 @@ export const PDFProvider = ({
   const [rotation, setRotation] = useState<number>(0);
   const [isScrolling, setIsScrolling] = useState<boolean>(false);
   const [isContentVisible, setIsContentVisible] = useState<boolean>(false);
+  const [currentContent, setCurrentContent] = useState<"highlights" | null>(
+    null
+  );
   const [toolbarPosition, setToolbarPosition] = useLocalState<"top" | "bottom">(
     "pdf-toolbar-position",
     "bottom"
+  );
+  const [highlights, setHighlights] = useLocalState<Highlight[]>(
+    "highlights",
+    []
   );
   const textLayerRef = useRef<HTMLDivElement>(null);
   const pagesRefs = useRef<Map<number, HTMLDivElement>>(new Map());
@@ -321,6 +339,40 @@ export const PDFProvider = ({
     e.target.select();
   };
 
+  const toggleHighlightsTab = () => {
+    if (currentContent === "highlights" && isContentVisible) {
+      setIsContentVisible(false);
+      setCurrentContent(null);
+    } else {
+      setCurrentContent("highlights");
+      setIsContentVisible(true);
+    }
+  };
+
+  const closeContentTab = () => {
+    setIsContentVisible(false);
+    setCurrentContent(null);
+  };
+
+  const removeHighlightById = useCallback(
+    (highlightId: string) => {
+      if (textLayerRef.current) {
+        removeHighlight(textLayerRef.current, highlightId);
+      }
+      setHighlights((prev) => prev.filter((h) => h.id !== highlightId));
+    },
+    [textLayerRef]
+  );
+
+  const clearAllHighlights = () => {
+    highlights.forEach((highlight) => {
+      if (textLayerRef.current) {
+        removeHighlight(textLayerRef.current, highlight.id);
+      }
+    });
+    setHighlights([]);
+  };
+
   // Sync zoom input with zoom level changes
   useEffect(() => {
     setZoomInputValue(`${Math.round(zoomLevel * 100)}%`);
@@ -424,6 +476,9 @@ export const PDFProvider = ({
     isScrolling,
     isContentVisible,
     setIsContentVisible,
+    currentContent,
+    setCurrentContent,
+    toggleHighlightsTab,
     onLoadSuccess,
     toolbarPosition,
     setToolbarPosition,
@@ -446,6 +501,11 @@ export const PDFProvider = ({
     validateAndNavigateToPage,
     validateAndSetZoom,
     onSelection,
+    closeContentTab,
+    highlights,
+    setHighlights,
+    removeHighlightById,
+    clearAllHighlights,
   };
 
   return (

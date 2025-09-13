@@ -15,6 +15,7 @@ import {
   EyeIcon,
   MoreHorizontalIcon,
   CheckIcon,
+  HighlighterIcon,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -53,6 +54,7 @@ export default function PdfToolbar({ className = "" }: { className?: string }) {
     setIsContentVisible,
     toolbarPosition,
     setToolbarPosition,
+    toggleHighlightsTab,
   } = usePDF();
 
   const handlePageSubmit = (value: string) => {
@@ -160,6 +162,15 @@ export default function PdfToolbar({ className = "" }: { className?: string }) {
             className="h-8 w-8 rounded-full"
           >
             <RotateCwIcon className="h-4 w-4" />
+          </Button>
+
+          <Button
+            variant="outline"
+            size="icon"
+            onClick={toggleHighlightsTab}
+            className="h-8 w-8 rounded-full"
+          >
+            <HighlighterIcon className="h-4 w-4" />
           </Button>
         </div>
 

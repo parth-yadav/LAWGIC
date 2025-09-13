@@ -1,11 +1,34 @@
 "use client";
 import { cn } from "@/lib/utils";
 import { usePDF } from "@/pdf/PdfProvider";
-import { CopyIcon, LoaderCircleIcon } from "lucide-react";
+import {
+  ChevronDownIcon,
+  CopyIcon,
+  HighlighterIcon,
+  LoaderCircleIcon,
+} from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Document, Page } from "react-pdf";
 import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/ui/button";
+import {
+  DEFAULT_HIGHLIGHT_COLOR,
+  DEFAULT_HIGHLIGHT_COLORS,
+  Highlight,
+  HighlightColor,
+} from "./highlight/types";
+import useLocalState from "@/hooks/useLocalState";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import {
+  applyHighlights,
+  createHighlightFromSelection,
+  debounce,
+  validateHighlight,
+} from "./highlight/utils";
 
 export default function PdfViewer({ className = "" }: { className?: string }) {
   const [selection, setSelection] = useState<{
@@ -16,6 +39,12 @@ export default function PdfViewer({ className = "" }: { className?: string }) {
     selectionRect: DOMRect;
     shouldShowBelow: boolean;
   } | null>(null);
+
+  const [currentHighlightColor, setCurrentHighlightColor] =
+    useLocalState<HighlightColor>(
+      "current-highlight-color",
+      DEFAULT_HIGHLIGHT_COLOR
+    );
 
   const contextMenuRef = useRef<HTMLDivElement>(null);
   const selectionCheckInterval = useRef<NodeJS.Timeout | null>(null);
@@ -31,6 +60,8 @@ export default function PdfViewer({ className = "" }: { className?: string }) {
     pagesRefs,
     onLoadSuccess,
     toolbarPosition,
+    highlights,
+    setHighlights,
   } = usePDF();
 
   // Clear text selection
@@ -154,6 +185,60 @@ export default function PdfViewer({ className = "" }: { className?: string }) {
       }
     };
 
+  const highlightSelectedText = useCallback(
+    (color: HighlightColor = currentHighlightColor) => {
+      if (selection?.selectedText.trim() && textLayerRef.current) {
+        setCurrentHighlightColor(color);
+
+        const highlight = createHighlightFromSelection(
+          textLayerRef.current,
+          pageNumber,
+          { color }
+        );
+        if (highlight) {
+          setHighlights((prev) => [...prev, highlight]);
+        }
+        clearSelection();
+      }
+    },
+    [selection, textLayerRef, pageNumber, currentHighlightColor]
+  );
+
+  const applyHighlightsToTextLayer = useCallback(
+    debounce(() => {
+      if (!textLayerRef.current || highlights.length === 0) return;
+
+      try {
+        // Filter valid highlights - apply all highlights for now to debug the issue
+        const validHighlights = highlights.filter((highlight) => {
+          if (!validateHighlight(highlight)) {
+            console.warn("Invalid highlight found:", highlight);
+            return false;
+          }
+          return true; // Apply all highlights, remove page filtering for now
+        });
+
+        console.log(
+          "Applying highlights:",
+          validHighlights.length,
+          "total highlights:",
+          highlights.length
+        );
+
+        if (validHighlights.length > 0) {
+          applyHighlights(textLayerRef.current, validHighlights);
+        }
+      } catch (error) {
+        console.error("Failed to apply highlights:", error);
+      }
+    }, 150),
+    [textLayerRef, highlights]
+  );
+
+  useEffect(() => {
+    applyHighlightsToTextLayer();
+  }, [applyHighlightsToTextLayer]);
+
   // Set up event listeners
   useEffect(() => {
     if (!textLayerRef.current) return;
@@ -223,6 +308,7 @@ export default function PdfViewer({ className = "" }: { className?: string }) {
             </div>
           ))}
       </Document>
+
       <AnimatePresence>
         {selection && (
           <motion.div
@@ -236,7 +322,8 @@ export default function PdfViewer({ className = "" }: { className?: string }) {
               e.preventDefault();
             }}
             className={cn(
-              "fixed bg-card p-2 px-3 rounded-md shadow-lg border-border border z-100000"
+              "fixed bg-card p-2 px-3 rounded-md shadow-lg border-border border z-100000",
+              "flex flex-row items-center gap-2"
             )}
             style={{
               left: Math.min(
@@ -258,9 +345,58 @@ export default function PdfViewer({ className = "" }: { className?: string }) {
               onClick={handleCopy}
               className="flex items-center gap-2 text-sm"
             >
-              <CopyIcon className="h-4 w-4" />
+              <CopyIcon />
               Copy
             </Button>
+
+            <div className="flex flex-row items-center gap-2 pl-2 h-full border-l border-border">
+              <span>Highlight</span>
+              <div className="flex flex-row items-center">
+                <Button
+                  type="button"
+                  variant={"outline"}
+                  size="sm"
+                  onClick={() => highlightSelectedText()}
+                  className="flex items-center gap-2 text-sm rounded-r-none"
+                  style={{
+                    backgroundColor: currentHighlightColor.backgroundColor,
+                    borderColor: currentHighlightColor.borderColor,
+                  }}
+                >
+                  <HighlighterIcon />
+                </Button>
+
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      size={"sm"}
+                      variant={"outline"}
+                      className={"px-0 rounded-l-none"}
+                    >
+                      <ChevronDownIcon />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="translate-y-2 flex flex-row gap-1 w-max">
+                    {DEFAULT_HIGHLIGHT_COLORS.map((color, index) => (
+                      <Button
+                        key={index}
+                        type="button"
+                        variant={"outline"}
+                        size="sm"
+                        onClick={() => highlightSelectedText(color)}
+                        className="flex items-center gap-2 text-sm"
+                        style={{
+                          backgroundColor: color.backgroundColor,
+                          borderColor: color.borderColor,
+                        }}
+                      >
+                        <HighlighterIcon />
+                      </Button>
+                    ))}
+                  </PopoverContent>
+                </Popover>
+              </div>
+            </div>
           </motion.div>
         )}
       </AnimatePresence>

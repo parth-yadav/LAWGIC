@@ -50,11 +50,10 @@ export default function PdfToolbar({ className = "" }: { className?: string }) {
     validateAndNavigateToPage,
     validateAndSetZoom,
     scrollToPage,
-    isContentVisible,
-    setIsContentVisible,
     toolbarPosition,
     setToolbarPosition,
     toggleHighlightsTab,
+    highlights,
   } = usePDF();
 
   const handlePageSubmit = (value: string) => {
@@ -168,9 +167,12 @@ export default function PdfToolbar({ className = "" }: { className?: string }) {
             variant="outline"
             size="icon"
             onClick={toggleHighlightsTab}
-            className="h-8 w-8 rounded-full"
+            className="h-8 w-8 rounded-full relative"
           >
             <HighlighterIcon className="h-4 w-4" />
+            <span className="absolute -top-1 -right-1 bg-primary text-primary-foreground text-xs font-bold rounded-full px-1">
+              {highlights.length}
+            </span>
           </Button>
         </div>
 
@@ -194,15 +196,6 @@ export default function PdfToolbar({ className = "" }: { className?: string }) {
               </motion.div>
             )}
           </AnimatePresence>
-
-          <Button
-            variant="outline"
-            size="icon"
-            onClick={() => setIsContentVisible(!isContentVisible)}
-            className="h-8 w-8 rounded-full"
-          >
-            {isContentVisible ? <EyeOffIcon /> : <EyeIcon />}
-          </Button>
 
           <ThemeSwitch />
 

@@ -23,12 +23,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import {
-  applyHighlights,
-  createHighlightFromSelection,
-  debounce,
-  validateHighlight,
-} from "./highlight/utils";
+import { createHighlightFromSelection } from "./highlight/utils";
 
 export default function PdfViewer({ className = "" }: { className?: string }) {
   const [selection, setSelection] = useState<{
@@ -204,41 +199,6 @@ export default function PdfViewer({ className = "" }: { className?: string }) {
     [selection, textLayerRef, pageNumber, currentHighlightColor]
   );
 
-  const applyHighlightsToTextLayer = useCallback(
-    debounce(() => {
-      if (!textLayerRef.current || highlights.length === 0) return;
-
-      try {
-        // Filter valid highlights - apply all highlights for now to debug the issue
-        const validHighlights = highlights.filter((highlight) => {
-          if (!validateHighlight(highlight)) {
-            console.warn("Invalid highlight found:", highlight);
-            return false;
-          }
-          return true; // Apply all highlights, remove page filtering for now
-        });
-
-        console.log(
-          "Applying highlights:",
-          validHighlights.length,
-          "total highlights:",
-          highlights.length
-        );
-
-        if (validHighlights.length > 0) {
-          applyHighlights(textLayerRef.current, validHighlights);
-        }
-      } catch (error) {
-        console.error("Failed to apply highlights:", error);
-      }
-    }, 150),
-    [textLayerRef, highlights]
-  );
-
-  useEffect(() => {
-    applyHighlightsToTextLayer();
-  }, [applyHighlightsToTextLayer]);
-
   // Set up event listeners
   useEffect(() => {
     if (!textLayerRef.current) return;
@@ -357,7 +317,7 @@ export default function PdfViewer({ className = "" }: { className?: string }) {
                   variant={"outline"}
                   size="sm"
                   onClick={() => highlightSelectedText()}
-                  className="flex items-center gap-2 text-sm rounded-r-none"
+                  className="flex items-center gap-2 text-sm rounded-r-none text-black"
                   style={{
                     backgroundColor: currentHighlightColor.backgroundColor,
                     borderColor: currentHighlightColor.borderColor,
@@ -384,7 +344,7 @@ export default function PdfViewer({ className = "" }: { className?: string }) {
                         variant={"outline"}
                         size="sm"
                         onClick={() => highlightSelectedText(color)}
-                        className="flex items-center gap-2 text-sm"
+                        className="flex items-center gap-2 text-sm text-black"
                         style={{
                           backgroundColor: color.backgroundColor,
                           borderColor: color.borderColor,

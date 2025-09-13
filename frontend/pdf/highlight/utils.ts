@@ -6,8 +6,18 @@ import {
   DEFAULT_HIGHLIGHT_COLOR,
 } from "./types";
 
+// ========================================
+// XPATH AND DOM NAVIGATION UTILITIES
+// ========================================
+
 /**
  * Creates a unique XPath for a DOM node
+ *
+ * This function generates an XPath expression that uniquely identifies
+ * a DOM node within its document. Used for persisting text selections.
+ *
+ * @param {Node} node - The DOM node to create an XPath for
+ * @returns {string} The XPath expression
  */
 export function getXPath(node: Node): string {
   if (node.nodeType === Node.DOCUMENT_NODE) {
@@ -31,6 +41,13 @@ export function getXPath(node: Node): string {
 
 /**
  * Finds a DOM node using XPath
+ *
+ * Safely evaluates an XPath expression to find a specific DOM node.
+ * Returns null if the XPath is invalid or the node is not found.
+ *
+ * @param {string} xpath - The XPath expression to evaluate
+ * @param {Element} container - The container element to search within
+ * @returns {Node | null} The found node or null
  */
 export function getNodeByXPath(xpath: string, container: Element): Node | null {
   try {
@@ -48,8 +65,20 @@ export function getNodeByXPath(xpath: string, container: Element): Node | null {
   }
 }
 
+// ========================================
+// TEXT OFFSET CALCULATION UTILITIES
+// ========================================
+
 /**
  * Calculates text offset from the beginning of the container
+ *
+ * This function walks through all text nodes in the container and
+ * calculates the absolute text offset for a given node and position.
+ *
+ * @param {Element} container - The container element
+ * @param {Node} node - The target text node
+ * @param {number} offset - The offset within the node
+ * @returns {number} The absolute text offset from container start
  */
 export function getTextOffset(
   container: Element,
@@ -75,6 +104,13 @@ export function getTextOffset(
 
 /**
  * Finds text node and offset from absolute text offset
+ *
+ * Given an absolute text offset, this function finds the corresponding
+ * text node and the relative offset within that node.
+ *
+ * @param {Element} container - The container element
+ * @param {number} targetOffset - The absolute text offset to find
+ * @returns {Object | null} Object containing node and offset, or null
  */
 export function findTextNodeAndOffset(
   container: Element,
@@ -101,8 +137,20 @@ export function findTextNodeAndOffset(
   return null;
 }
 
+// ========================================
+// HIGHLIGHT CREATION UTILITIES
+// ========================================
+
 /**
  * Creates a highlight from current selection
+ *
+ * This function takes the current browser selection and creates a
+ * Highlight object with proper positioning and metadata.
+ *
+ * @param {Element} container - The container element containing the selection
+ * @param {number} pageNumber - The current page number
+ * @param {HighlightOptions} options - Additional options for the highlight
+ * @returns {Highlight | null} The created highlight or null if invalid
  */
 export function createHighlightFromSelection(
   container: Element,
@@ -158,8 +206,18 @@ export function createHighlightFromSelection(
   return highlight;
 }
 
+// ========================================
+// HIGHLIGHT APPLICATION UTILITIES
+// ========================================
+
 /**
  * Applies highlights to a container with performance optimizations
+ *
+ * This is the main function for rendering highlights in the DOM.
+ * It handles performance optimization, error handling, and overlapping highlights.
+ *
+ * @param {Element} container - The container element to apply highlights to
+ * @param {Highlight[]} highlights - Array of highlights to apply
  */
 export function applyHighlights(
   container: Element,
@@ -210,43 +268,13 @@ export function applyHighlights(
 }
 
 /**
- * Removes all highlights from container
- */
-export function removeAllHighlights(container: Element): void {
-  const highlights = container.querySelectorAll(".text-highlight");
-  highlights.forEach((highlight) => {
-    const parent = highlight.parentNode;
-    if (parent) {
-      // Replace highlight with its text content
-      const textNode = document.createTextNode(highlight.textContent || "");
-      parent.replaceChild(textNode, highlight);
-    }
-  });
-
-  // Normalize text nodes
-  normalizeTextNodes(container);
-}
-
-/**
- * Removes a specific highlight by ID
- */
-export function removeHighlight(container: Element, highlightId: string): void {
-  const highlights = container.querySelectorAll(
-    `[data-highlight-id="${highlightId}"]`
-  );
-  highlights.forEach((highlight) => {
-    const parent = highlight.parentNode;
-    if (parent) {
-      const textNode = document.createTextNode(highlight.textContent || "");
-      parent.replaceChild(textNode, highlight);
-    }
-  });
-
-  normalizeTextNodes(container);
-}
-
-/**
  * Applies a single highlight to the container
+ *
+ * Handles the DOM manipulation required to wrap text content
+ * with highlight spans for a single highlight.
+ *
+ * @param {Element} container - The container element
+ * @param {Highlight} highlight - The highlight to apply
  */
 function applySingleHighlight(container: Element, highlight: Highlight): void {
   const startPos = findTextNodeAndOffset(
@@ -282,6 +310,12 @@ function applySingleHighlight(container: Element, highlight: Highlight): void {
 
 /**
  * Creates a highlight span element
+ *
+ * Creates a styled span element that will wrap the highlighted text
+ * with appropriate styling and data attributes.
+ *
+ * @param {Highlight} highlight - The highlight to create a span for
+ * @returns {HTMLSpanElement} The configured span element
  */
 function createHighlightSpan(highlight: Highlight): HTMLSpanElement {
   const span = document.createElement("span");
@@ -311,6 +345,12 @@ function createHighlightSpan(highlight: Highlight): HTMLSpanElement {
 
 /**
  * Wraps a range in a span (simple case)
+ *
+ * Handles the simple case where the selection range is contained
+ * within a single text node.
+ *
+ * @param {Range} range - The range to wrap
+ * @param {HTMLSpanElement} span - The span element to wrap with
  */
 function wrapRangeInSpan(range: Range, span: HTMLSpanElement): void {
   try {
@@ -325,6 +365,12 @@ function wrapRangeInSpan(range: Range, span: HTMLSpanElement): void {
 
 /**
  * Wraps a multi-node range in spans
+ *
+ * Handles the complex case where the selection spans multiple
+ * text nodes or elements.
+ *
+ * @param {Range} range - The range to wrap
+ * @param {HTMLSpanElement} templateSpan - The template span to clone
  */
 function wrapMultiNodeRange(range: Range, templateSpan: HTMLSpanElement): void {
   const walker = document.createTreeWalker(
@@ -361,8 +407,69 @@ function wrapMultiNodeRange(range: Range, templateSpan: HTMLSpanElement): void {
   });
 }
 
+// ========================================
+// HIGHLIGHT REMOVAL UTILITIES
+// ========================================
+
+/**
+ * Removes all highlights from container
+ *
+ * Cleans up all highlight spans and normalizes the text content
+ * back to its original state.
+ *
+ * @param {Element} container - The container to remove highlights from
+ */
+export function removeAllHighlights(container: Element): void {
+  const highlights = container.querySelectorAll(".text-highlight");
+  highlights.forEach((highlight) => {
+    const parent = highlight.parentNode;
+    if (parent) {
+      // Replace highlight with its text content
+      const textNode = document.createTextNode(highlight.textContent || "");
+      parent.replaceChild(textNode, highlight);
+    }
+  });
+
+  // Normalize text nodes
+  normalizeTextNodes(container);
+}
+
+/**
+ * Removes a specific highlight by ID
+ *
+ * Removes only the highlight with the specified ID while preserving
+ * other highlights in the container.
+ *
+ * @param {Element} container - The container element
+ * @param {string} highlightId - The ID of the highlight to remove
+ */
+export function removeHighlight(container: Element, highlightId: string): void {
+  const highlights = container.querySelectorAll(
+    `[data-highlight-id="${highlightId}"]`
+  );
+  highlights.forEach((highlight) => {
+    const parent = highlight.parentNode;
+    if (parent) {
+      const textNode = document.createTextNode(highlight.textContent || "");
+      parent.replaceChild(textNode, highlight);
+    }
+  });
+
+  normalizeTextNodes(container);
+}
+
+// ========================================
+// HIGHLIGHT OVERLAP UTILITIES
+// ========================================
+
 /**
  * Groups overlapping highlights
+ *
+ * Organizes highlights into groups based on whether they overlap
+ * in their text positions. This helps handle complex rendering scenarios.
+ *
+ * @param {Highlight[]} highlights - Array of highlights to group
+ * @returns {Highlight[][]} Array of highlight groups
  */
 function groupOverlappingHighlights(highlights: Highlight[]): Highlight[][] {
   const groups: Highlight[][] = [];
@@ -372,8 +479,6 @@ function groupOverlappingHighlights(highlights: Highlight[]): Highlight[][] {
     if (currentGroup.length === 0) {
       currentGroup.push(highlight);
     } else {
-      const lastHighlight = currentGroup[currentGroup.length - 1];
-
       // Check if current highlight overlaps with any in current group
       const overlaps = currentGroup.some((h) =>
         highlightsOverlap(h, highlight)
@@ -397,6 +502,12 @@ function groupOverlappingHighlights(highlights: Highlight[]): Highlight[][] {
 
 /**
  * Checks if two highlights overlap
+ *
+ * Determines whether two highlights have overlapping text positions.
+ *
+ * @param {Highlight} a - First highlight
+ * @param {Highlight} b - Second highlight
+ * @returns {boolean} True if highlights overlap
  */
 function highlightsOverlap(a: Highlight, b: Highlight): boolean {
   return !(
@@ -407,6 +518,12 @@ function highlightsOverlap(a: Highlight, b: Highlight): boolean {
 
 /**
  * Applies overlapping highlights with layered effect
+ *
+ * Handles the rendering of multiple overlapping highlights.
+ * Currently uses a simplified approach that applies each highlight separately.
+ *
+ * @param {Element} container - The container element
+ * @param {Highlight[]} highlights - Array of overlapping highlights
  */
 function applyOverlappingHighlights(
   container: Element,
@@ -419,8 +536,17 @@ function applyOverlappingHighlights(
   });
 }
 
+// ========================================
+// DOM MANIPULATION UTILITIES
+// ========================================
+
 /**
  * Normalizes text nodes to merge adjacent text nodes
+ *
+ * After removing highlights, adjacent text nodes may be created.
+ * This function merges them back together for cleaner DOM structure.
+ *
+ * @param {Element} container - The container to normalize
  */
 function normalizeTextNodes(container: Element): void {
   const walker = document.createTreeWalker(
@@ -453,8 +579,19 @@ function normalizeTextNodes(container: Element): void {
   }
 }
 
+// ========================================
+// UTILITY FUNCTIONS
+// ========================================
+
 /**
  * Debounced function helper
+ *
+ * Creates a debounced version of a function that delays execution
+ * until after a specified wait time has elapsed.
+ *
+ * @param {T} func - Function to debounce
+ * @param {number} wait - Wait time in milliseconds
+ * @returns {Function} Debounced function
  */
 export function debounce<T extends (...args: any[]) => any>(
   func: T,
@@ -469,6 +606,11 @@ export function debounce<T extends (...args: any[]) => any>(
 
 /**
  * Gets all highlights in a container
+ *
+ * Returns all highlight elements currently rendered in the container.
+ *
+ * @param {Element} container - The container to search in
+ * @returns {Element[]} Array of highlight elements
  */
 export function getHighlightsInContainer(container: Element): Element[] {
   return Array.from(container.querySelectorAll(".text-highlight"));
@@ -476,6 +618,12 @@ export function getHighlightsInContainer(container: Element): Element[] {
 
 /**
  * Validates highlight data
+ *
+ * Type guard function that checks if an object conforms to the
+ * Highlight interface structure.
+ *
+ * @param {any} highlight - Object to validate
+ * @returns {boolean} True if object is a valid Highlight
  */
 export function validateHighlight(highlight: any): highlight is Highlight {
   return (
@@ -490,8 +638,17 @@ export function validateHighlight(highlight: any): highlight is Highlight {
   );
 }
 
+// ========================================
+// CLEANUP AND EVENT HANDLING
+// ========================================
+
 /**
  * Cleanup function to remove event listeners and observers
+ *
+ * Performs cleanup operations when highlights are no longer needed.
+ * Removes all highlights and associated event listeners.
+ *
+ * @param {Element} container - The container to clean up
  */
 export function cleanupHighlights(container: Element): void {
   try {
@@ -509,6 +666,11 @@ export function cleanupHighlights(container: Element): void {
 
 /**
  * Default highlight click handler
+ *
+ * Handles click events on highlight elements and emits custom events
+ * for the application to respond to.
+ *
+ * @param {Event} event - The click event
  */
 function handleHighlightClick(event: Event): void {
   const target = event.target as HTMLElement;
@@ -524,6 +686,12 @@ function handleHighlightClick(event: Event): void {
 
 /**
  * Batch highlight operations for better performance
+ *
+ * Allows multiple highlight operations to be batched together
+ * for better performance when making many changes at once.
+ *
+ * @param {Element} container - The container element
+ * @param {Array} operations - Array of operations to perform
  */
 export function batchHighlightOperations(
   container: Element,
@@ -535,9 +703,6 @@ export function batchHighlightOperations(
   }>
 ): void {
   if (!container || operations.length === 0) return;
-
-  // Use document fragment for better performance
-  const fragment = document.createDocumentFragment();
 
   try {
     operations.forEach((operation) => {

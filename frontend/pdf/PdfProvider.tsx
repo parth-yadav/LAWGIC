@@ -475,33 +475,36 @@ export const PDFProvider = ({
       const pageElement = pagesRefs.current?.get(highlight.position.pageNumber);
       if (pageElement) {
         // Find the highlight span by data-highlight-id
-        const highlightElement = pageElement.querySelector(
-          `[data-highlight-id="${highlight.id}"]`
-        ) as HTMLElement | null;
+        const highlightElements = Array.from(
+          pageElement.querySelectorAll(`[data-highlight-id="${highlight.id}"]`)
+        ) as HTMLElement[];
 
-        if (highlightElement) {
+        if (highlightElements && highlightElements.length > 0) {
           // Scroll the highlight span into the center of the viewport
-          highlightElement.scrollIntoView({
-            behavior: "smooth",
-            block: "center",
-            inline: "center",
-          });
+          highlightElements.forEach((highlightElement) => {
+            highlightElement.scrollIntoView({
+              behavior: "smooth",
+              block: "center",
+              inline: "center",
+            });
 
-          // Optionally flash the highlight
-          highlightElement.style.boxShadow = "0 0 0 4px #f00, 0 0 16px #f00";
-          highlightElement.style.transition = "box-shadow 0.2s, transform 0.2s";
-          highlightElement.animate(
-            [
-              { transform: "translateX(0px)" },
-              { transform: "translateX(-8px)" },
-              { transform: "translateX(8px)" },
-              { transform: "translateX(0px)" },
-            ],
-            { duration: 400, easing: "ease" }
-          );
-          setTimeout(() => {
-            highlightElement.style.boxShadow = "none";
-          }, 800);
+            // Optionally flash the highlight
+            highlightElement.style.boxShadow = "0 0 0 4px #f00, 0 0 16px #f00";
+            highlightElement.style.transition =
+              "box-shadow 0.2s, transform 0.2s";
+            highlightElement.animate(
+              [
+                { transform: "translateX(0px)" },
+                { transform: "translateX(-8px)" },
+                { transform: "translateX(8px)" },
+                { transform: "translateX(0px)" },
+              ],
+              { duration: 400, easing: "ease" }
+            );
+            setTimeout(() => {
+              highlightElement.style.boxShadow = "none";
+            }, 800);
+          });
         }
       }
     },

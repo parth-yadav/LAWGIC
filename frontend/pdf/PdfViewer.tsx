@@ -1,4 +1,9 @@
 "use client";
+
+// ========================================
+// IMPORTS
+// ========================================
+
 import { cn } from "@/lib/utils";
 import { usePDF } from "@/pdf/PdfProvider";
 import {
@@ -27,25 +32,62 @@ import {
 import { createHighlightFromSelection } from "./highlight/utils";
 import { Separator } from "@/components/ui/separator";
 
-export default function PdfViewer({ className = "" }: { className?: string }) {
-  const [selection, setSelection] = useState<{
-    selectedText: string;
-    currentPage: number;
-    x: number;
-    y: number;
-    selectionRect: DOMRect;
-    shouldShowBelow: boolean;
-  } | null>(null);
+// ========================================
+// TYPES AND INTERFACES
+// ========================================
 
+/**
+ * Represents an active text selection in the PDF viewer
+ */
+interface TextSelection {
+  selectedText: string;
+  currentPage: number;
+  x: number;
+  y: number;
+  selectionRect: DOMRect;
+  shouldShowBelow: boolean;
+}
+
+// ========================================
+// MAIN COMPONENT
+// ========================================
+
+/**
+ * PdfViewer Component
+ *
+ * Main PDF viewing component that handles:
+ * - PDF document rendering with react-pdf
+ * - Text selection and highlight creation
+ * - Context menus for highlight actions
+ * - Keyboard and mouse interactions
+ *
+ * @param {Object} props - Component props
+ * @param {string} props.className - Additional CSS classes
+ * @returns {JSX.Element} The PDF viewer component
+ */
+export default function PdfViewer({ className = "" }: { className?: string }) {
+  // ========================================
+  // STATE MANAGEMENT
+  // ========================================
+
+  const [selection, setSelection] = useState<TextSelection | null>(null);
   const [currentHighlightColor, setCurrentHighlightColor] =
     useLocalState<HighlightColor>(
       "current-highlight-color",
       DEFAULT_HIGHLIGHT_COLOR
     );
 
+  // ========================================
+  // REFS
+  // ========================================
+
   const contextMenuRef = useRef<HTMLDivElement>(null);
   const selectionCheckInterval = useRef<NodeJS.Timeout | null>(null);
   const highlightContextMenuRef = useRef<HTMLDivElement | null>(null);
+
+  // ========================================
+  // CONTEXT VALUES
+  // ========================================
 
   const {
     pdfUrl,
@@ -65,7 +107,13 @@ export default function PdfViewer({ className = "" }: { className?: string }) {
     removeHighlightById,
   } = usePDF();
 
-  // Clear text selection
+  // ========================================
+  // SELECTION MANAGEMENT FUNCTIONS
+  // ========================================
+
+  /**
+   * Clears the current text selection and resets selection state
+   */
   const clearSelection = useCallback(() => {
     const selection = window.getSelection();
     if (selection) {
@@ -74,7 +122,10 @@ export default function PdfViewer({ className = "" }: { className?: string }) {
     setSelection(null);
   }, []);
 
-  // Check if text is still selected
+  /**
+   * Checks if text is still selected and updates state accordingly
+   * Used to detect when selection is lost
+   */
   const checkSelection = useCallback(() => {
     const currentSelection = window.getSelection();
     const selectedText = currentSelection?.toString();
@@ -88,10 +139,12 @@ export default function PdfViewer({ className = "" }: { className?: string }) {
     }
   }, []);
 
-  // Handle text selection
+  /**
+   * Handles mouse up events to detect text selections
+   * Creates selection state for context menu positioning
+   */
   const handleMouseUp = useCallback(
     (e: MouseEvent) => {
-      console.log(e);
       const browserSelection = window.getSelection();
       const selectedText = browserSelection?.toString();
 
@@ -143,7 +196,13 @@ export default function PdfViewer({ className = "" }: { className?: string }) {
     [pageNumber, textLayerRef, checkSelection]
   );
 
-  // Handle clicks outside context menu
+  // ========================================
+  // EVENT HANDLERS
+  // ========================================
+
+  /**
+   * Handles clicks outside context menus to close them
+   */
   const handleClickOutside = useCallback((e: MouseEvent) => {
     const target = e.target as Node;
 
@@ -156,7 +215,10 @@ export default function PdfViewer({ className = "" }: { className?: string }) {
     }
   }, []);
 
-  // Handle copy action
+  /**
+   * Handles copy action for selected text
+   * Supports both modern clipboard API and fallback for older browsers
+   */
   const handleCopy = useCallback(async () => {
     if (selection?.selectedText) {
       try {
@@ -176,7 +238,15 @@ export default function PdfViewer({ className = "" }: { className?: string }) {
     }
   }, [selection, clearSelection]);
 
-  // Helper function to set page ref
+  // ========================================
+  // HELPER FUNCTIONS
+  // ========================================
+
+  /**
+   * Helper function to set page ref in the pages ref map
+   * @param {number} pageNumber - The page number
+   * @returns {Function} Function to set the element ref
+   */
   const setPageRef =
     (pageNumber: number) => (element: HTMLDivElement | null) => {
       if (element) {
@@ -186,6 +256,14 @@ export default function PdfViewer({ className = "" }: { className?: string }) {
       }
     };
 
+  // ========================================
+  // HIGHLIGHT FUNCTIONS
+  // ========================================
+
+  /**
+   * Creates a highlight from the current text selection
+   * @param {HighlightColor} color - The color to use for the highlight
+   */
   const highlightSelectedText = useCallback(
     (color: HighlightColor = currentHighlightColor) => {
       if (selection?.selectedText.trim() && textLayerRef.current) {

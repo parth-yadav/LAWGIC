@@ -81,8 +81,26 @@ type PDFContextType = {
   ) => void;
   jumpToHighlight: (highlight: Highlight) => void;
   applyHighlightsToTextLayer: () => void;
-};
 
+  highlightContextMenu: {
+    highlight: Highlight;
+    x: number;
+    y: number;
+    showColorPicker: boolean;
+    editingNote: boolean;
+    noteText: string;
+  } | null;
+  setHighlightContextMenu: React.Dispatch<
+    React.SetStateAction<{
+      highlight: Highlight;
+      x: number;
+      y: number;
+      showColorPicker: boolean;
+      editingNote: boolean;
+      noteText: string;
+    } | null>
+  >;
+};
 const PDFContext = createContext<PDFContextType | undefined>(undefined);
 
 pdfjs.GlobalWorkerOptions.workerSrc = new URL(
@@ -118,6 +136,15 @@ export const PDFProvider = ({
     "highlights",
     []
   );
+  const [highlightContextMenu, setHighlightContextMenu] = useState<{
+    highlight: Highlight;
+    x: number;
+    y: number;
+    showColorPicker: boolean;
+    editingNote: boolean;
+    noteText: string;
+  } | null>(null);
+
   const textLayerRef = useRef<HTMLDivElement>(null);
   const pagesRefs = useRef<Map<number, HTMLDivElement>>(new Map());
   const scrollTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -399,16 +426,32 @@ export const PDFProvider = ({
           return true; // Apply all highlights, remove page filtering for now
         });
 
-        console.log(
-          "Applying highlights:",
-          validHighlights.length,
-          "total highlights:",
-          highlights.length
-        );
-
         if (validHighlights.length > 0) {
           applyHighlights(textLayerRef.current, validHighlights);
         }
+
+        setTimeout(() => {
+          validHighlights.forEach((highlight) => {
+            const highlightElements = document.querySelectorAll(
+              `[data-highlight-id="${highlight.id}"]`
+            );
+
+            if (!highlightElements.length) return;
+
+            highlightElements.forEach((el) => {
+              el.addEventListener("click", (e) => {
+                setHighlightContextMenu({
+                  highlight,
+                  x: (e as MouseEvent).clientX,
+                  y: (e as MouseEvent).clientY,
+                  showColorPicker: false,
+                  editingNote: false,
+                  noteText: "",
+                });
+              });
+            });
+          });
+        }, 500);
       } catch (error) {
         console.error("Failed to apply highlights:", error);
       }
@@ -605,6 +648,8 @@ export const PDFProvider = ({
     updateHighlightById,
     jumpToHighlight,
     applyHighlightsToTextLayer,
+    highlightContextMenu,
+    setHighlightContextMenu,
   };
 
   return (

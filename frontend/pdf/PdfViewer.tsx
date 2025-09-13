@@ -6,6 +6,7 @@ import {
   CopyIcon,
   HighlighterIcon,
   LoaderCircleIcon,
+  Trash2Icon,
 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Document, Page } from "react-pdf";
@@ -24,6 +25,7 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { createHighlightFromSelection } from "./highlight/utils";
+import { Separator } from "@/components/ui/separator";
 
 export default function PdfViewer({ className = "" }: { className?: string }) {
   const [selection, setSelection] = useState<{
@@ -43,6 +45,7 @@ export default function PdfViewer({ className = "" }: { className?: string }) {
 
   const contextMenuRef = useRef<HTMLDivElement>(null);
   const selectionCheckInterval = useRef<NodeJS.Timeout | null>(null);
+  const highlightContextMenuRef = useRef<HTMLDivElement | null>(null);
 
   const {
     pdfUrl,
@@ -55,8 +58,11 @@ export default function PdfViewer({ className = "" }: { className?: string }) {
     pagesRefs,
     onLoadSuccess,
     toolbarPosition,
-    highlights,
     setHighlights,
+    applyHighlightsToTextLayer,
+    highlightContextMenu,
+    setHighlightContextMenu,
+    removeHighlightById,
   } = usePDF();
 
   // Clear text selection
@@ -263,6 +269,9 @@ export default function PdfViewer({ className = "" }: { className?: string }) {
               <Page
                 pageIndex={i}
                 width={pdfWidth}
+                renderAnnotationLayer={false}
+                renderTextLayer={true}
+                onRenderTextLayerSuccess={applyHighlightsToTextLayer}
                 className="border border-border shadow-lg bg-white"
               />
             </div>
@@ -357,6 +366,54 @@ export default function PdfViewer({ className = "" }: { className?: string }) {
                 </Popover>
               </div>
             </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {highlightContextMenu && (
+          <motion.div
+            ref={highlightContextMenuRef}
+            initial={{ opacity: 0, scale: 0.8 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.8 }}
+            transition={{
+              duration: 0.15,
+              type: "spring",
+              stiffness: 500,
+              damping: 30,
+            }}
+            style={{
+              left: highlightContextMenu.x,
+              top: highlightContextMenu.y,
+              pointerEvents: "auto",
+            }}
+            onMouseLeave={() => setHighlightContextMenu(null)}
+            className={cn(
+              "bg-card border border-border rounded-2xl shadow-md p-2",
+              "absolute top-0 left-0 z-[100000]",
+              "flex flex-col items-stretch w-40 gap-2"
+            )}
+            onClick={(e) => {
+              setHighlightContextMenu(null);
+              e.stopPropagation();
+              e.preventDefault();
+            }}
+          >
+            <span>
+              Note: {highlightContextMenu.highlight.metadata.note ?? "No note"}
+            </span>
+            <Separator />
+
+            <Button
+              variant={"destructive"}
+              onClick={() =>
+                removeHighlightById(highlightContextMenu.highlight.id)
+              }
+            >
+              <Trash2Icon />
+              Delete
+            </Button>
           </motion.div>
         )}
       </AnimatePresence>

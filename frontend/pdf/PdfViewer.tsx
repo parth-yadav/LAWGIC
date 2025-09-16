@@ -1,24 +1,93 @@
 "use client";
+
+// ========================================
+// IMPORTS
+// ========================================
+
 import { cn } from "@/lib/utils";
 import { usePDF } from "@/pdf/PdfProvider";
-import { CopyIcon, LoaderCircleIcon } from "lucide-react";
+import {
+  ChevronDownIcon,
+  CopyIcon,
+  HighlighterIcon,
+  LoaderCircleIcon,
+  Trash2Icon,
+} from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Document, Page } from "react-pdf";
 import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/ui/button";
+import {
+  DEFAULT_HIGHLIGHT_COLOR,
+  DEFAULT_HIGHLIGHT_COLORS,
+  Highlight,
+  HighlightColor,
+} from "./highlight/types";
+import useLocalState from "@/hooks/useLocalState";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { createHighlightFromSelection } from "./highlight/utils";
+import { Separator } from "@/components/ui/separator";
 
+// ========================================
+// TYPES AND INTERFACES
+// ========================================
+
+/**
+ * Represents an active text selection in the PDF viewer
+ */
+interface TextSelection {
+  selectedText: string;
+  currentPage: number;
+  x: number;
+  y: number;
+  selectionRect: DOMRect;
+  shouldShowBelow: boolean;
+}
+
+// ========================================
+// MAIN COMPONENT
+// ========================================
+
+/**
+ * PdfViewer Component
+ *
+ * Main PDF viewing component that handles:
+ * - PDF document rendering with react-pdf
+ * - Text selection and highlight creation
+ * - Context menus for highlight actions
+ * - Keyboard and mouse interactions
+ *
+ * @param {Object} props - Component props
+ * @param {string} props.className - Additional CSS classes
+ * @returns {JSX.Element} The PDF viewer component
+ */
 export default function PdfViewer({ className = "" }: { className?: string }) {
-  const [selection, setSelection] = useState<{
-    selectedText: string;
-    currentPage: number;
-    x: number;
-    y: number;
-    selectionRect: DOMRect;
-    shouldShowBelow: boolean;
-  } | null>(null);
+  // ========================================
+  // STATE MANAGEMENT
+  // ========================================
+
+  const [selection, setSelection] = useState<TextSelection | null>(null);
+  const [currentHighlightColor, setCurrentHighlightColor] =
+    useLocalState<HighlightColor>(
+      "current-highlight-color",
+      DEFAULT_HIGHLIGHT_COLOR
+    );
+
+  // ========================================
+  // REFS
+  // ========================================
 
   const contextMenuRef = useRef<HTMLDivElement>(null);
   const selectionCheckInterval = useRef<NodeJS.Timeout | null>(null);
+  const highlightContextMenuRef = useRef<HTMLDivElement | null>(null);
+
+  // ========================================
+  // CONTEXT VALUES
+  // ========================================
 
   const {
     pdfUrl,
@@ -31,9 +100,20 @@ export default function PdfViewer({ className = "" }: { className?: string }) {
     pagesRefs,
     onLoadSuccess,
     toolbarPosition,
+    setHighlights,
+    applyHighlightsToTextLayer,
+    highlightContextMenu,
+    setHighlightContextMenu,
+    removeHighlightById,
   } = usePDF();
 
-  // Clear text selection
+  // ========================================
+  // SELECTION MANAGEMENT FUNCTIONS
+  // ========================================
+
+  /**
+   * Clears the current text selection and resets selection state
+   */
   const clearSelection = useCallback(() => {
     const selection = window.getSelection();
     if (selection) {
@@ -42,7 +122,10 @@ export default function PdfViewer({ className = "" }: { className?: string }) {
     setSelection(null);
   }, []);
 
-  // Check if text is still selected
+  /**
+   * Checks if text is still selected and updates state accordingly
+   * Used to detect when selection is lost
+   */
   const checkSelection = useCallback(() => {
     const currentSelection = window.getSelection();
     const selectedText = currentSelection?.toString();
@@ -56,10 +139,12 @@ export default function PdfViewer({ className = "" }: { className?: string }) {
     }
   }, []);
 
-  // Handle text selection
+  /**
+   * Handles mouse up events to detect text selections
+   * Creates selection state for context menu positioning
+   */
   const handleMouseUp = useCallback(
     (e: MouseEvent) => {
-      console.log(e);
       const browserSelection = window.getSelection();
       const selectedText = browserSelection?.toString();
 
@@ -111,7 +196,13 @@ export default function PdfViewer({ className = "" }: { className?: string }) {
     [pageNumber, textLayerRef, checkSelection]
   );
 
-  // Handle clicks outside context menu
+  // ========================================
+  // EVENT HANDLERS
+  // ========================================
+
+  /**
+   * Handles clicks outside context menus to close them
+   */
   const handleClickOutside = useCallback((e: MouseEvent) => {
     const target = e.target as Node;
 
@@ -124,7 +215,10 @@ export default function PdfViewer({ className = "" }: { className?: string }) {
     }
   }, []);
 
-  // Handle copy action
+  /**
+   * Handles copy action for selected text
+   * Supports both modern clipboard API and fallback for older browsers
+   */
   const handleCopy = useCallback(async () => {
     if (selection?.selectedText) {
       try {
@@ -144,7 +238,15 @@ export default function PdfViewer({ className = "" }: { className?: string }) {
     }
   }, [selection, clearSelection]);
 
-  // Helper function to set page ref
+  // ========================================
+  // HELPER FUNCTIONS
+  // ========================================
+
+  /**
+   * Helper function to set page ref in the pages ref map
+   * @param {number} pageNumber - The page number
+   * @returns {Function} Function to set the element ref
+   */
   const setPageRef =
     (pageNumber: number) => (element: HTMLDivElement | null) => {
       if (element) {
@@ -153,6 +255,33 @@ export default function PdfViewer({ className = "" }: { className?: string }) {
         pagesRefs.current?.delete(pageNumber);
       }
     };
+
+  // ========================================
+  // HIGHLIGHT FUNCTIONS
+  // ========================================
+
+  /**
+   * Creates a highlight from the current text selection
+   * @param {HighlightColor} color - The color to use for the highlight
+   */
+  const highlightSelectedText = useCallback(
+    (color: HighlightColor = currentHighlightColor) => {
+      if (selection?.selectedText.trim() && textLayerRef.current) {
+        setCurrentHighlightColor(color);
+
+        const highlight = createHighlightFromSelection(
+          textLayerRef.current,
+          pageNumber,
+          { color }
+        );
+        if (highlight) {
+          setHighlights((prev) => [...prev, highlight]);
+        }
+        clearSelection();
+      }
+    },
+    [selection, textLayerRef, pageNumber, currentHighlightColor]
+  );
 
   // Set up event listeners
   useEffect(() => {
@@ -218,11 +347,15 @@ export default function PdfViewer({ className = "" }: { className?: string }) {
               <Page
                 pageIndex={i}
                 width={pdfWidth}
+                renderAnnotationLayer={false}
+                renderTextLayer={true}
+                onRenderTextLayerSuccess={applyHighlightsToTextLayer}
                 className="border border-border shadow-lg bg-white"
               />
             </div>
           ))}
       </Document>
+
       <AnimatePresence>
         {selection && (
           <motion.div
@@ -236,7 +369,8 @@ export default function PdfViewer({ className = "" }: { className?: string }) {
               e.preventDefault();
             }}
             className={cn(
-              "fixed bg-card p-2 px-3 rounded-md shadow-lg border-border border z-100000"
+              "fixed bg-card p-2 px-3 rounded-md shadow-lg border-border border z-100000",
+              "flex flex-row items-center gap-2"
             )}
             style={{
               left: Math.min(
@@ -258,8 +392,105 @@ export default function PdfViewer({ className = "" }: { className?: string }) {
               onClick={handleCopy}
               className="flex items-center gap-2 text-sm"
             >
-              <CopyIcon className="h-4 w-4" />
+              <CopyIcon />
               Copy
+            </Button>
+
+            <div className="flex flex-row items-center gap-2 pl-2 h-full border-l border-border">
+              <span>Highlight</span>
+              <div className="flex flex-row items-center">
+                <Button
+                  type="button"
+                  variant={"outline"}
+                  size="sm"
+                  onClick={() => highlightSelectedText()}
+                  className="flex items-center gap-2 text-sm rounded-r-none text-black"
+                  style={{
+                    backgroundColor: currentHighlightColor.backgroundColor,
+                    borderColor: currentHighlightColor.borderColor,
+                  }}
+                >
+                  <HighlighterIcon />
+                </Button>
+
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <Button
+                      size={"sm"}
+                      variant={"outline"}
+                      className={"px-0 rounded-l-none"}
+                    >
+                      <ChevronDownIcon />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="translate-y-2 flex flex-row gap-1 w-max">
+                    {DEFAULT_HIGHLIGHT_COLORS.map((color, index) => (
+                      <Button
+                        key={index}
+                        type="button"
+                        variant={"outline"}
+                        size="sm"
+                        onClick={() => highlightSelectedText(color)}
+                        className="flex items-center gap-2 text-sm text-black"
+                        style={{
+                          backgroundColor: color.backgroundColor,
+                          borderColor: color.borderColor,
+                        }}
+                      >
+                        <HighlighterIcon />
+                      </Button>
+                    ))}
+                  </PopoverContent>
+                </Popover>
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {highlightContextMenu && (
+          <motion.div
+            ref={highlightContextMenuRef}
+            initial={{ opacity: 0, scale: 0.8 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.8 }}
+            transition={{
+              duration: 0.15,
+              type: "spring",
+              stiffness: 500,
+              damping: 30,
+            }}
+            style={{
+              left: highlightContextMenu.x,
+              top: highlightContextMenu.y,
+              pointerEvents: "auto",
+            }}
+            onMouseLeave={() => setHighlightContextMenu(null)}
+            className={cn(
+              "bg-card border border-border rounded-2xl shadow-md p-2",
+              "absolute top-0 left-0 z-[100000]",
+              "flex flex-col items-stretch w-40 gap-2"
+            )}
+            onClick={(e) => {
+              setHighlightContextMenu(null);
+              e.stopPropagation();
+              e.preventDefault();
+            }}
+          >
+            <span>
+              Note: {highlightContextMenu.highlight.metadata.note ?? "No note"}
+            </span>
+            <Separator />
+
+            <Button
+              variant={"destructive"}
+              onClick={() =>
+                removeHighlightById(highlightContextMenu.highlight.id)
+              }
+            >
+              <Trash2Icon />
+              Delete
             </Button>
           </motion.div>
         )}

@@ -15,6 +15,13 @@ import React, {
 } from "react";
 import { LoaderCircleIcon } from "lucide-react";
 import useLocalState from "@/hooks/useLocalState";
+import { Highlight } from "./highlight/types";
+import {
+  applyHighlights,
+  debounce,
+  removeHighlight,
+  validateHighlight,
+} from "./highlight/utils";
 
 type PDFContextType = {
   pdfUrl: string;
@@ -37,6 +44,9 @@ type PDFContextType = {
   isScrolling: boolean;
   isContentVisible: boolean;
   setIsContentVisible: React.Dispatch<React.SetStateAction<boolean>>;
+  currentContent: "highlights" | null;
+  setCurrentContent: React.Dispatch<React.SetStateAction<"highlights" | null>>;
+  toggleHighlightsTab: () => void;
   toolbarPosition: "top" | "bottom";
   setToolbarPosition: React.Dispatch<React.SetStateAction<"top" | "bottom">>;
   onLoadSuccess: ({ numPages }: { numPages: number }) => void;
@@ -59,8 +69,38 @@ type PDFContextType = {
   validateAndNavigateToPage: (value: string) => boolean;
   validateAndSetZoom: (value: string) => boolean;
   onSelection: (args: { selectedText: string; currentPage: number }) => void;
-};
+  closeContentTab: () => void;
 
+  highlights: Highlight[];
+  setHighlights: React.Dispatch<React.SetStateAction<Highlight[]>>;
+  removeHighlightById: (highlightId: string) => void;
+  clearAllHighlights: () => void;
+  updateHighlightById: (
+    highlightId: string,
+    newData: Partial<Highlight>
+  ) => void;
+  jumpToHighlight: (highlight: Highlight) => void;
+  applyHighlightsToTextLayer: () => void;
+
+  highlightContextMenu: {
+    highlight: Highlight;
+    x: number;
+    y: number;
+    showColorPicker: boolean;
+    editingNote: boolean;
+    noteText: string;
+  } | null;
+  setHighlightContextMenu: React.Dispatch<
+    React.SetStateAction<{
+      highlight: Highlight;
+      x: number;
+      y: number;
+      showColorPicker: boolean;
+      editingNote: boolean;
+      noteText: string;
+    } | null>
+  >;
+};
 const PDFContext = createContext<PDFContextType | undefined>(undefined);
 
 pdfjs.GlobalWorkerOptions.workerSrc = new URL(
@@ -85,10 +125,26 @@ export const PDFProvider = ({
   const [rotation, setRotation] = useState<number>(0);
   const [isScrolling, setIsScrolling] = useState<boolean>(false);
   const [isContentVisible, setIsContentVisible] = useState<boolean>(false);
+  const [currentContent, setCurrentContent] = useState<"highlights" | null>(
+    null
+  );
   const [toolbarPosition, setToolbarPosition] = useLocalState<"top" | "bottom">(
     "pdf-toolbar-position",
     "bottom"
   );
+  const [highlights, setHighlights] = useLocalState<Highlight[]>(
+    "highlights",
+    []
+  );
+  const [highlightContextMenu, setHighlightContextMenu] = useState<{
+    highlight: Highlight;
+    x: number;
+    y: number;
+    showColorPicker: boolean;
+    editingNote: boolean;
+    noteText: string;
+  } | null>(null);
+
   const textLayerRef = useRef<HTMLDivElement>(null);
   const pagesRefs = useRef<Map<number, HTMLDivElement>>(new Map());
   const scrollTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -191,6 +247,7 @@ export const PDFProvider = ({
   const onLoadSuccess = ({ numPages }: { numPages: number }) => {
     setNumPages(numPages);
     setLoading(false);
+    applyHighlightsToTextLayer();
   };
 
   const goToPrevPage = useCallback(() => {
@@ -321,6 +378,143 @@ export const PDFProvider = ({
     e.target.select();
   };
 
+  const toggleHighlightsTab = () => {
+    if (currentContent === "highlights" && isContentVisible) {
+      setIsContentVisible(false);
+      setCurrentContent(null);
+    } else {
+      setCurrentContent("highlights");
+      setIsContentVisible(true);
+    }
+  };
+
+  const closeContentTab = () => {
+    setIsContentVisible(false);
+    setCurrentContent(null);
+  };
+
+  const removeHighlightById = useCallback(
+    (highlightId: string) => {
+      if (textLayerRef.current) {
+        removeHighlight(textLayerRef.current, highlightId);
+      }
+      setHighlights((prev) => prev.filter((h) => h.id !== highlightId));
+    },
+    [textLayerRef]
+  );
+
+  const clearAllHighlights = () => {
+    highlights.forEach((highlight) => {
+      if (textLayerRef.current) {
+        removeHighlight(textLayerRef.current, highlight.id);
+      }
+    });
+    setHighlights([]);
+  };
+
+  const applyHighlightsToTextLayer = useCallback(
+    debounce(() => {
+      if (!textLayerRef.current || highlights.length === 0) return;
+
+      try {
+        // Filter valid highlights - apply all highlights for now to debug the issue
+        const validHighlights = highlights.filter((highlight) => {
+          if (!validateHighlight(highlight)) {
+            console.warn("Invalid highlight found:", highlight);
+            return false;
+          }
+          return true; // Apply all highlights, remove page filtering for now
+        });
+
+        if (validHighlights.length > 0) {
+          applyHighlights(textLayerRef.current, validHighlights);
+        }
+
+        setTimeout(() => {
+          validHighlights.forEach((highlight) => {
+            const highlightElements = document.querySelectorAll(
+              `[data-highlight-id="${highlight.id}"]`
+            );
+
+            if (!highlightElements.length) return;
+
+            highlightElements.forEach((el) => {
+              el.addEventListener("click", (e) => {
+                setHighlightContextMenu({
+                  highlight,
+                  x: (e as MouseEvent).clientX,
+                  y: (e as MouseEvent).clientY,
+                  showColorPicker: false,
+                  editingNote: false,
+                  noteText: "",
+                });
+              });
+            });
+          });
+        }, 500);
+      } catch (error) {
+        console.error("Failed to apply highlights:", error);
+      }
+    }, 150),
+    [textLayerRef, highlights]
+  );
+
+  const updateHighlightById = (
+    highlightId: string,
+    newData: Partial<Highlight>
+  ) => {
+    setHighlights((prev) =>
+      prev.map((highlight) =>
+        highlight.id === highlightId ? { ...highlight, ...newData } : highlight
+      )
+    );
+  };
+
+  const jumpToHighlight = useCallback(
+    (highlight: Highlight) => {
+      const pageElement = pagesRefs.current?.get(highlight.position.pageNumber);
+      if (pageElement) {
+        // Find the highlight span by data-highlight-id
+        const highlightElements = Array.from(
+          pageElement.querySelectorAll(`[data-highlight-id="${highlight.id}"]`)
+        ) as HTMLElement[];
+
+        if (highlightElements && highlightElements.length > 0) {
+          // Scroll the highlight span into the center of the viewport
+          highlightElements.forEach((highlightElement) => {
+            highlightElement.scrollIntoView({
+              behavior: "smooth",
+              block: "center",
+              inline: "center",
+            });
+
+            // Optionally flash the highlight
+            highlightElement.style.boxShadow = "0 0 0 4px #f00, 0 0 16px #f00";
+            highlightElement.style.transition =
+              "box-shadow 0.2s, transform 0.2s";
+            highlightElement.animate(
+              [
+                { transform: "translateX(0px)" },
+                { transform: "translateX(-8px)" },
+                { transform: "translateX(8px)" },
+                { transform: "translateX(0px)" },
+              ],
+              { duration: 400, easing: "ease" }
+            );
+            setTimeout(() => {
+              highlightElement.style.boxShadow = "none";
+            }, 800);
+          });
+        }
+      }
+    },
+    [pagesRefs]
+  );
+
+  useEffect(() => {
+    applyHighlightsToTextLayer();
+  }, [applyHighlightsToTextLayer, highlights, textLayerRef.current]);
+
   // Sync zoom input with zoom level changes
   useEffect(() => {
     setZoomInputValue(`${Math.round(zoomLevel * 100)}%`);
@@ -424,6 +618,9 @@ export const PDFProvider = ({
     isScrolling,
     isContentVisible,
     setIsContentVisible,
+    currentContent,
+    setCurrentContent,
+    toggleHighlightsTab,
     onLoadSuccess,
     toolbarPosition,
     setToolbarPosition,
@@ -446,6 +643,16 @@ export const PDFProvider = ({
     validateAndNavigateToPage,
     validateAndSetZoom,
     onSelection,
+    closeContentTab,
+    highlights,
+    setHighlights,
+    removeHighlightById,
+    clearAllHighlights,
+    updateHighlightById,
+    jumpToHighlight,
+    applyHighlightsToTextLayer,
+    highlightContextMenu,
+    setHighlightContextMenu,
   };
 
   return (

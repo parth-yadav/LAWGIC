@@ -11,9 +11,10 @@ import {
   CopyIcon,
   HighlighterIcon,
   LoaderCircleIcon,
+  MessageCircleQuestionIcon,
   Trash2Icon,
 } from "lucide-react";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState, useTransition } from "react";
 import { Document, Page } from "react-pdf";
 import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/ui/button";
@@ -31,6 +32,12 @@ import {
 } from "@/components/ui/popover";
 import { createHighlightFromSelection } from "./highlight/utils";
 import { Separator } from "@/components/ui/separator";
+import ApiClient from "@/utils/ApiClient";
+import { start } from "repl";
+import { extractContextText } from "./explain/extractContext";
+import { set } from "zod";
+import { se } from "date-fns/locale";
+import { toast } from "sonner";
 
 // ========================================
 // TYPES AND INTERFACES
@@ -71,11 +78,13 @@ export default function PdfViewer({ className = "" }: { className?: string }) {
   // ========================================
 
   const [selection, setSelection] = useState<TextSelection | null>(null);
+  const [isExplaining, startExplaining] = useTransition();
   const [currentHighlightColor, setCurrentHighlightColor] =
     useLocalState<HighlightColor>(
       "current-highlight-color",
       DEFAULT_HIGHLIGHT_COLOR
     );
+  const [explanation, setExplanation] = useState<ExplanationData | null>(null);
 
   // ========================================
   // REFS
@@ -120,6 +129,7 @@ export default function PdfViewer({ className = "" }: { className?: string }) {
       selection.removeAllRanges();
     }
     setSelection(null);
+    setExplanation(null);
   }, []);
 
   /**
@@ -132,6 +142,7 @@ export default function PdfViewer({ className = "" }: { className?: string }) {
 
     if (!selectedText?.trim()) {
       setSelection(null);
+      setExplanation(null);
       if (selectionCheckInterval.current) {
         clearInterval(selectionCheckInterval.current);
         selectionCheckInterval.current = null;
@@ -154,6 +165,7 @@ export default function PdfViewer({ className = "" }: { className?: string }) {
         !browserSelection?.rangeCount
       ) {
         setSelection(null);
+        setExplanation(null);
         return;
       }
 
@@ -211,6 +223,7 @@ export default function PdfViewer({ className = "" }: { className?: string }) {
       const selectedText = window.getSelection()?.toString();
       if (!selectedText?.trim()) {
         setSelection(null);
+        setExplanation(null);
       }
     }
   }, []);
@@ -241,6 +254,51 @@ export default function PdfViewer({ className = "" }: { className?: string }) {
   // ========================================
   // HELPER FUNCTIONS
   // ========================================
+
+  /**
+   * Handles the explain action for selected text
+   * Extracts context and sends to AI for explanation
+   */
+  const handleExplainText = useCallback(async () => {
+    startExplaining(async () => {
+      if (!selection?.selectedText || isExplaining) return;
+
+      try {
+        // Extract context text from PDF
+        const context = await extractContextText(pdfUrl, pageNumber);
+
+        // Prepare payload for API
+        const payload = {
+          selectionText: selection.selectedText,
+          currentPageText: context.currentPageText,
+          prevPageText: context.prevPageText,
+          nextPageText: context.nextPageText,
+          page: pageNumber,
+        };
+
+        const response = await ApiClient.post("/explain/text", payload);
+
+        if (response.data.success) {
+          const explanationData = response.data.data;
+          console.log("Explanation received:", explanationData);
+          setExplanation(explanationData);
+        } else {
+          console.error("Failed to get explanation:", response.data.error);
+        }
+      } catch (error) {
+        console.error("Error explaining text:", error);
+      } finally {
+        toast.success("Explanation complete !!");
+      }
+    });
+  }, [
+    selection,
+    pageNumber,
+    pdfUrl,
+    isExplaining,
+    clearSelection,
+    textLayerRef,
+  ]);
 
   /**
    * Helper function to set page ref in the pages ref map
@@ -370,7 +428,7 @@ export default function PdfViewer({ className = "" }: { className?: string }) {
             }}
             className={cn(
               "fixed bg-card p-2 px-3 rounded-md shadow-lg border-border border z-100000",
-              "flex flex-row items-center gap-2"
+              "flex flex-col gap-2"
             )}
             style={{
               left: Math.min(
@@ -385,65 +443,95 @@ export default function PdfViewer({ className = "" }: { className?: string }) {
                 : "translateY(-100%)",
             }}
           >
-            <Button
-              type="button"
-              variant={"outline"}
-              size="sm"
-              onClick={handleCopy}
-              className="flex items-center gap-2 text-sm"
-            >
-              <CopyIcon />
-              Copy
-            </Button>
+            <div className="flex flex-row items-center gap-2">
+              <Button
+                type="button"
+                variant={"outline"}
+                size="sm"
+                onClick={handleCopy}
+                className="flex items-center gap-2 text-sm"
+              >
+                <CopyIcon />
+                Copy
+              </Button>
 
-            <div className="flex flex-row items-center gap-2 pl-2 h-full border-l border-border">
-              <span>Highlight</span>
-              <div className="flex flex-row items-center">
-                <Button
-                  type="button"
-                  variant={"outline"}
-                  size="sm"
-                  onClick={() => highlightSelectedText()}
-                  className="flex items-center gap-2 text-sm rounded-r-none text-black"
-                  style={{
-                    backgroundColor: currentHighlightColor.backgroundColor,
-                    borderColor: currentHighlightColor.borderColor,
-                  }}
-                >
-                  <HighlighterIcon />
-                </Button>
+              <Button
+                variant={"outline"}
+                size="sm"
+                onClick={handleExplainText}
+                disabled={isExplaining || !!explanation}
+                className="flex items-center gap-2 text-sm"
+              >
+                {isExplaining ? (
+                  <LoaderCircleIcon className="animate-spin" />
+                ) : (
+                  <MessageCircleQuestionIcon />
+                )}
+                Explain
+              </Button>
 
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <Button
-                      size={"sm"}
-                      variant={"outline"}
-                      className={"px-0 rounded-l-none"}
-                    >
-                      <ChevronDownIcon />
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="translate-y-2 flex flex-row gap-1 w-max">
-                    {DEFAULT_HIGHLIGHT_COLORS.map((color, index) => (
+              <div className="flex flex-row items-center gap-2 pl-2 h-full border-l border-border">
+                <span>Highlight</span>
+                <div className="flex flex-row items-center">
+                  <Button
+                    type="button"
+                    variant={"outline"}
+                    size="sm"
+                    onClick={() => highlightSelectedText()}
+                    className="flex items-center gap-2 text-sm rounded-r-none text-black"
+                    style={{
+                      backgroundColor: currentHighlightColor.backgroundColor,
+                      borderColor: currentHighlightColor.borderColor,
+                    }}
+                  >
+                    <HighlighterIcon />
+                  </Button>
+
+                  <Popover>
+                    <PopoverTrigger asChild>
                       <Button
-                        key={index}
-                        type="button"
+                        size={"sm"}
                         variant={"outline"}
-                        size="sm"
-                        onClick={() => highlightSelectedText(color)}
-                        className="flex items-center gap-2 text-sm text-black"
-                        style={{
-                          backgroundColor: color.backgroundColor,
-                          borderColor: color.borderColor,
-                        }}
+                        className={"px-0 rounded-l-none"}
                       >
-                        <HighlighterIcon />
+                        <ChevronDownIcon />
                       </Button>
-                    ))}
-                  </PopoverContent>
-                </Popover>
+                    </PopoverTrigger>
+                    <PopoverContent className="translate-y-2 flex flex-row gap-1 w-max">
+                      {DEFAULT_HIGHLIGHT_COLORS.map((color, index) => (
+                        <Button
+                          key={index}
+                          type="button"
+                          variant={"outline"}
+                          size="sm"
+                          onClick={() => highlightSelectedText(color)}
+                          className="flex items-center gap-2 text-sm text-black"
+                          style={{
+                            backgroundColor: color.backgroundColor,
+                            borderColor: color.borderColor,
+                          }}
+                        >
+                          <HighlighterIcon />
+                        </Button>
+                      ))}
+                    </PopoverContent>
+                  </Popover>
+                </div>
               </div>
             </div>
+            <AnimatePresence>
+              {explanation && (
+                <motion.div
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: "auto" }}
+                  exit={{ opacity: 0, height: 0 }}
+                  transition={{ duration: 0.2 }}
+                  className="mt-2 p-2 bg-muted text-sm rounded-md overflow-y-auto text-muted-foreground"
+                >
+                  {explanation.meaning}
+                </motion.div>
+              )}
+            </AnimatePresence>
           </motion.div>
         )}
       </AnimatePresence>

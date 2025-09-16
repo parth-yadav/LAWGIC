@@ -42,6 +42,7 @@ export interface Threat {
   category?: string;
   position?: ThreatPosition | null;
   wordIndices?: number[];
+  _highlightData?: any; // Store the complete highlight data from backend
 }
 
 /**

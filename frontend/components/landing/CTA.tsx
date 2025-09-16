@@ -2,48 +2,66 @@
 
 import { Button } from "@/components/ui/button";
 import Reveal from "@/components/animations/Reveal";
-import { ArrowRightIcon, ScaleIcon } from "lucide-react";
+import { ArrowRightIcon, ScaleIcon, CheckCircleIcon, ZapIcon, ShieldCheckIcon } from "lucide-react";
 import Link from "next/link";
 
 export default function CTA() {
   return (
-    <section className="py-20 md:py-32 bg-gradient-to-r from-primary/10 via-primary/5 to-background">
-      <div className="container px-4 mx-auto">
+    <section className="py-20 md:py-32 bg-gradient-to-br from-primary/10 via-primary/5 to-background w-full relative">
+      {/* Animated background elements */}
+      <div className="absolute inset-0">
+        <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-gradient-to-r from-primary/20 to-blue-600/20 rounded-full blur-3xl animate-pulse"></div>
+        <div className="absolute bottom-1/4 right-1/4 w-80 h-80 bg-gradient-to-r from-blue-600/20 to-purple-600/20 rounded-full blur-3xl animate-pulse delay-1000"></div>
+      </div>
+
+      <div className="container px-4 mx-auto relative z-10">
         <div className="max-w-4xl mx-auto text-center">
           <Reveal type="bottomUp" duration={0.8}>
-            <div className="inline-flex items-center px-3 py-1 rounded-full text-sm bg-primary/20 text-primary border border-primary/30 mb-6">
-              <ScaleIcon className="w-4 h-4 mr-2" />
+            <div className="inline-flex items-center px-4 py-2 rounded-full text-sm bg-primary/20 text-primary border border-primary/30 mb-6 hover:bg-primary/30 hover:scale-105 transition-all duration-300">
+              <ScaleIcon className="w-4 h-4 mr-2 animate-pulse" />
               Ready to Understand Legal Documents?
             </div>
           </Reveal>
 
           <Reveal type="bottomUp" duration={0.8} delay={0.2}>
-            <h2 className="text-3xl md:text-5xl lg:text-6xl font-bold text-foreground mb-6">
+            <h2 className="text-3xl md:text-5xl lg:text-6xl font-bold text-foreground mb-6 leading-tight">
               Start Analyzing Documents
-              <span className="block text-primary">Today</span>
+              <span className="block bg-gradient-to-r from-primary via-blue-600 to-purple-600 bg-clip-text text-transparent animate-gradient-x bg-300%">
+                Today
+              </span>
             </h2>
           </Reveal>
 
           <Reveal type="bottomUp" duration={0.8} delay={0.4}>
             <p className="text-xl md:text-2xl text-muted-foreground mb-8 max-w-2xl mx-auto leading-relaxed">
-              Join thousands of people who now understand their legal documents.
-              Get clear insights in minutes, not hours.
+              Join{" "}
+              <span className="text-primary font-bold">thousands of people</span>{" "}
+              who now understand their legal documents.
+              Get clear insights in{" "}
+              <span className="text-primary font-bold">minutes, not hours</span>.
             </p>
           </Reveal>
 
           <Reveal type="bottomUp" duration={0.8} delay={0.6}>
             <div className="flex flex-col sm:flex-row gap-4 justify-center items-center mb-12">
               <Link href="/login">
-                <Button size="lg" className="text-lg px-8 py-6 rounded-full">
-                  Try It Free
-                  <ArrowRightIcon className="ml-2 h-5 w-5" />
+                <Button 
+                  size="lg" 
+                  className="group text-lg px-8 py-6 rounded-full relative overflow-hidden transition-all duration-300 hover:scale-105 hover:shadow-2xl hover:shadow-primary/25"
+                >
+                  <span className="relative z-10 flex items-center">
+                    Try It Free
+                    <ArrowRightIcon className="ml-2 h-5 w-5 group-hover:translate-x-1 transition-transform duration-300" />
+                  </span>
+                  <div className="absolute inset-0 bg-gradient-to-r from-primary/0 via-white/20 to-primary/0 -translate-x-full group-hover:translate-x-full transition-transform duration-1000"></div>
                 </Button>
               </Link>
               <Button
                 variant="outline"
                 size="lg"
-                className="text-lg px-8 py-6 rounded-full"
+                className="group text-lg px-8 py-6 rounded-full border-2 hover:border-primary/50 transition-all duration-300 hover:scale-105 hover:shadow-lg hover:bg-primary/5"
               >
+                <ZapIcon className="mr-2 h-5 w-5 group-hover:scale-110 transition-transform duration-300" />
                 See How It Works
               </Button>
             </div>
@@ -51,24 +69,38 @@ export default function CTA() {
 
           <Reveal type="fadeIn" duration={1} delay={0.8}>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mt-16">
-              <div className="text-center">
-                <div className="text-sm text-muted-foreground mb-2">
-                  ✓ Free to Try
+              {[
+                { 
+                  icon: CheckCircleIcon,
+                  title: "Free to Try",
+                  subtitle: "No Credit Card Required",
+                  color: "from-green-500 to-emerald-500"
+                },
+                {
+                  icon: ZapIcon,
+                  title: "Instant Results",
+                  subtitle: "Upload & Analyze",
+                  color: "from-yellow-500 to-orange-500"
+                },
+                {
+                  icon: ShieldCheckIcon,
+                  title: "Secure & Private",
+                  subtitle: "Your Documents Stay Safe",
+                  color: "from-blue-500 to-cyan-500"
+                }
+            ].map((feature, index) => (
+                <div key={feature.title} className="group text-center">
+                  <div className={`inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-br ${feature.color} text-white mb-4 group-hover:scale-110 group-hover:rotate-3 transition-all duration-300`}>
+                    <feature.icon className="w-8 h-8" />
+                  </div>
+                  <div className="text-sm text-muted-foreground mb-2 group-hover:text-foreground/80 transition-colors duration-300">
+                    ✓ {feature.title}
+                  </div>
+                  <div className="font-semibold text-foreground group-hover:text-primary transition-colors duration-300">
+                    {feature.subtitle}
+                  </div>
                 </div>
-                <div className="font-semibold">No Credit Card Required</div>
-              </div>
-              <div className="text-center">
-                <div className="text-sm text-muted-foreground mb-2">
-                  ✓ Instant Results
-                </div>
-                <div className="font-semibold">Upload & Analyze</div>
-              </div>
-              <div className="text-center">
-                <div className="text-sm text-muted-foreground mb-2">
-                  ✓ Secure & Private
-                </div>
-                <div className="font-semibold">Your Documents Stay Safe</div>
-              </div>
+              ))}
             </div>
           </Reveal>
         </div>

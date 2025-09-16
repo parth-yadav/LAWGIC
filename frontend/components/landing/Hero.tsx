@@ -7,7 +7,7 @@ import Link from "next/link";
 
 export default function Hero() {
   return (
-    <section className="py-20 md:py-32 bg-gradient-to-br from-background via-background to-secondary/20">
+    <section className="py-20 md:py-32 bg-gradient-to-br from-background via-background to-secondary/20 w-full">
       <div className="container px-4 mx-auto">
         <div className="text-center max-w-4xl mx-auto">
           <Reveal type="bottomUp" duration={0.8}>

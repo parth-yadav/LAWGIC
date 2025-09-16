@@ -1,17 +1,18 @@
-# PDF Highlight System Documentation (CLADE)
+# PDF Highlight & Threat Detection System Documentation (CLADE)
 
 ## Overview
 
-This document provides a comprehensive analysis of the PDF highlight system implementation in the GenAI project. The system provides sophisticated text highlighting, annotation, and navigation capabilities built on top of React PDF viewer components.
+This document provides a comprehensive analysis of the PDF highlight and threat detection system implementation in the GenAI project. The system provides sophisticated text highlighting, annotation, navigation capabilities, and AI-powered security threat detection built on top of React PDF viewer components.
 
 ## System Architecture
 
 ### Core Components
 
 1. **PDFProvider** (`pdf/PdfProvider.tsx`)
-   - Central state management for PDF viewing and highlighting
+   - Central state management for PDF viewing, highlighting, and threat detection
    - Context provider for all PDF-related functionality
    - Manages highlight persistence via localStorage
+   - Integrates with backend threat analysis API
 
 2. **PdfViewer** (`pdf/PdfViewer.tsx`)
    - Main PDF rendering component using react-pdf
@@ -20,15 +21,108 @@ This document provides a comprehensive analysis of the PDF highlight system impl
 
 3. **PdfContentTab** (`pdf/PdfContentTab.tsx`)
    - Collapsible sidebar for displaying PDF content panels
-   - Houses the highlights management interface
+   - Houses both highlights and threats management interfaces
 
 4. **PdfHighlights** (`pdf/highlight/PdfHighlights.tsx`)
    - Dedicated highlights management panel
    - Provides search, navigation, and editing capabilities
 
-5. **PdfToolbar** (`pdf/PdfToolbar.tsx`)
+5. **PdfThreats** (`pdf/highlight/PdfThreats.tsx`)
+   - NEW: Dedicated threats management panel
+   - Displays AI-detected security threats with severity levels
+   - Provides filtering, search, and navigation to threats
+
+6. **PdfToolbar** (`pdf/PdfToolbar.tsx`)
    - PDF navigation and control toolbar
    - Includes highlights toggle with count indicator
+   - NEW: Includes threats toggle with threat count indicator
+
+## NEW: Threat Detection System
+
+### Backend Integration (`simplebackend/server.js`)
+
+The system now integrates with a Node.js backend that uses Google Gemini AI for threat detection:
+
+#### API Endpoint
+```
+POST /analyze
+- Accepts: multipart/form-data with PDF file and word position data
+- Returns: ThreatAnalysisResult with detected threats and their locations
+```
+
+#### Threat Analysis Process
+1. **Word Extraction**: Frontend extracts word positions from PDF using react-pdf
+2. **Text Analysis**: Backend uses Gemini AI to analyze text for security threats
+3. **Position Mapping**: Backend maps detected threats back to word bounding boxes
+4. **Result Return**: Structured threat data with severity and confidence levels
+
+### Threat Types and Detection
+
+#### Security Focus Areas
+- SQL Injection patterns (UNION, SELECT, DROP, etc.)
+- Cross-Site Scripting (XSS) attempts
+- Command injection patterns
+- Path traversal attempts
+- Malicious URLs and IP addresses
+- Hardcoded credentials and API keys
+- Security misconfigurations
+- Suspicious code snippets
+- Social engineering patterns
+- Phishing indicators
+- Malware signatures
+
+#### Threat Severity Levels
+- **Critical**: Immediate security risks requiring urgent attention
+- **High**: Significant security concerns that should be addressed promptly
+- **Medium**: Moderate security issues that need investigation
+- **Low**: Minor security observations or best practice violations
+
+### New Type System Extensions
+
+### New Type System Extensions
+
+#### Threat Detection Types (`pdf/highlight/types.ts`)
+
+```typescript
+interface ThreatBoundingBox {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+interface Threat {
+  text: string;                         // The threatening text content
+  reason: string;                       // Explanation of why this is a threat
+  bbox: ThreatBoundingBox | null;       // Bounding box for visual highlighting
+  confidence: number;                   // AI confidence level (0-1)
+  severity?: 'low' | 'medium' | 'high' | 'critical';
+  category?: string;                    // Threat category (SQL injection, XSS, etc.)
+}
+
+interface PageThreats {
+  page: number;                         // Page number
+  threats: Threat[];                    // Array of threats on this page
+  totalWords: number;                   // Total words analyzed on page
+}
+
+interface ThreatAnalysisResult {
+  pages: PageThreats[];                 // All page results
+  totalPages: number;                   // Total pages analyzed
+  totalThreats: number;                 // Total threats found
+}
+```
+
+#### Threat-Specific Colors
+
+```typescript
+const THREAT_COLORS: HighlightColor[] = [
+  { id: "threat-critical", backgroundColor: "rgba(239, 68, 68, 0.3)" },
+  { id: "threat-high", backgroundColor: "rgba(249, 115, 22, 0.3)" },
+  { id: "threat-medium", backgroundColor: "rgba(245, 158, 11, 0.3)" },
+  { id: "threat-low", backgroundColor: "rgba(234, 179, 8, 0.3)" },
+];
+```
 
 ## Highlight Module Deep Dive
 
@@ -398,6 +492,69 @@ const [highlights, setHighlights] = useLocalState<Highlight[]>("highlights", [])
 3. Change colors via color picker
 4. Delete individual or all highlights
 
+### NEW: Threat Detection Workflow
+
+#### Analyzing PDF for Threats
+
+1. User opens PDF in viewer
+2. Clicks "Threats" button in toolbar
+3. Threats panel opens with "Analyze PDF" button
+4. System extracts word positions from PDF
+5. Backend analyzes content using Gemini AI
+6. Threats displayed with severity indicators
+7. User can filter by severity level
+8. Click threat to navigate to location
+
+#### Threat Management Features
+
+1. **Severity Filtering**: Filter threats by critical, high, medium, low
+2. **Search Functionality**: Search through threat text and descriptions
+3. **Jump to Threat**: Click any threat to navigate to its location in PDF
+4. **Visual Indicators**: Color-coded severity levels with appropriate icons
+5. **Summary Statistics**: Overview of threat distribution by severity
+6. **Real-time Analysis**: Background processing with loading indicators
+
+### Backend Configuration
+
+#### Environment Setup (`simplebackend/.env.example`)
+
+```bash
+# Google Gemini AI API Key
+GEMINI_API_KEY=your_gemini_api_key_here
+
+# Server Configuration  
+PORT=4000
+
+# Upload Configuration
+MAX_FILE_SIZE=50MB
+UPLOAD_DIR=uploads
+```
+
+#### API Response Format
+
+```json
+{
+  "pages": [
+    {
+      "page": 1,
+      "threats": [
+        {
+          "text": "SELECT * FROM users",
+          "reason": "Potential SQL injection pattern detected",
+          "bbox": { "x": 100, "y": 200, "width": 150, "height": 20 },
+          "confidence": 0.95,
+          "severity": "high",
+          "category": "SQL Injection"
+        }
+      ],
+      "totalWords": 1500
+    }
+  ],
+  "totalPages": 1,
+  "totalThreats": 1
+}
+```
+
 ## Future Enhancement Opportunities
 
 1. **Advanced Positioning**
@@ -415,10 +572,25 @@ const [highlights, setHighlights] = useLocalState<Highlight[]>("highlights", [])
    - JSON/CSV highlight exports
    - Annotation format compatibility
 
-4. **AI Integration**
-   - Automatic highlight suggestions
-   - Content summarization
-   - Semantic search capabilities
+4. **AI Integration** ✅ **IMPLEMENTED**
+   - ✅ Automatic threat detection using Gemini AI
+   - ✅ Security vulnerability scanning
+   - ✅ Content categorization by threat type
+   - 🔄 Content summarization
+   - 🔄 Semantic search capabilities
+
+5. **Enhanced Threat Detection**
+   - 🔄 Custom threat pattern definitions
+   - 🔄 Machine learning model training on domain-specific threats
+   - 🔄 Integration with security databases and CVE feeds
+   - 🔄 Automated reporting and alerting
+   - 🔄 Threat remediation suggestions
+
+6. **Advanced Analytics**
+   - 🔄 Threat trend analysis across documents
+   - 🔄 Risk scoring algorithms
+   - 🔄 Compliance checking against security standards
+   - 🔄 Audit trail and reporting
 
 ## Technical Dependencies
 
@@ -427,5 +599,23 @@ const [highlights, setHighlights] = useLocalState<Highlight[]>("highlights", [])
 - **lucide-react**: Icons throughout the interface
 - **localStorage**: Client-side persistence
 - **DOM APIs**: TreeWalker, Range, Selection, XPath evaluation
+- **NEW: Google Gemini AI**: Backend threat analysis and content understanding
+- **NEW: Express.js**: Backend API server
+- **NEW: Multer**: File upload handling
+- **NEW: CORS**: Cross-origin resource sharing
 
-This comprehensive documentation captures the sophisticated highlight system architecture, providing a foundation for future development and maintenance of the PDF highlighting capabilities.
+## Performance Considerations
+
+### Frontend Optimizations
+- Debounced threat analysis requests
+- Virtual scrolling for large threat lists
+- Lazy loading of threat details
+- Cached analysis results
+
+### Backend Optimizations
+- Rate limiting on analysis endpoints
+- Request queuing for concurrent analysis
+- Response caching for identical content
+- Optimized text chunking for AI analysis
+
+This comprehensive documentation captures both the sophisticated highlight system architecture and the new AI-powered threat detection capabilities, providing a foundation for future development and maintenance of the PDF security analysis platform.

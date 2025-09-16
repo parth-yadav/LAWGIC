@@ -16,6 +16,7 @@ import {
   MoreHorizontalIcon,
   CheckIcon,
   HighlighterIcon,
+  ShieldAlertIcon,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -53,7 +54,9 @@ export default function PdfToolbar({ className = "" }: { className?: string }) {
     toolbarPosition,
     setToolbarPosition,
     toggleHighlightsTab,
+    toggleThreatsTab,
     highlights,
+    threats,
   } = usePDF();
 
   const handlePageSubmit = (value: string) => {
@@ -173,6 +176,20 @@ export default function PdfToolbar({ className = "" }: { className?: string }) {
             <span className="absolute -top-1 -right-1 bg-primary text-primary-foreground text-xs font-bold rounded-full px-1">
               {highlights.length}
             </span>
+          </Button>
+
+          <Button
+            variant="outline"
+            size="icon"
+            onClick={toggleThreatsTab}
+            className="h-8 w-8 rounded-full relative"
+          >
+            <ShieldAlertIcon className="h-4 w-4" />
+            {threats && threats.totalThreats > 0 && (
+              <span className="absolute -top-1 -right-1 bg-red-600 text-white text-xs font-bold rounded-full px-1">
+                {threats.totalThreats}
+              </span>
+            )}
           </Button>
         </div>
 

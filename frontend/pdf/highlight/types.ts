@@ -1,4 +1,97 @@
 // ========================================
+// THREAT DETECTION TYPES
+// ========================================
+
+/**
+ * Represents a bounding box for threat location
+ *
+ * @interface ThreatBoundingBox
+ * @property {number} x - X coordinate
+ * @property {number} y - Y coordinate
+ * @property {number} width - Width of the bounding box
+ * @property {number} height - Height of the bounding box
+ */
+export interface ThreatBoundingBox {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+/**
+ * Represents a security threat detected in the PDF
+ *
+ * @interface Threat
+ * @property {string} [id] - Unique identifier for the threat
+ * @property {string} text - The threatening text content
+ * @property {string} reason - Explanation of why this is considered a threat
+ * @property {ThreatBoundingBox | null} bbox - Bounding box for visual highlighting
+ * @property {number} confidence - Confidence level (0-1)
+ * @property {string} [severity] - Threat severity level
+ * @property {string} [category] - Threat category (SQL injection, XSS, etc.)
+ * @property {ThreatPosition | null} [position] - Position information for precise highlighting
+ * @property {number[]} [wordIndices] - Array of word indices for precise positioning
+ */
+export interface Threat {
+  id?: string;
+  text: string;
+  reason: string;
+  bbox: ThreatBoundingBox | null;
+  confidence: number;
+  severity?: 'low' | 'medium' | 'high' | 'critical';
+  category?: string;
+  position?: ThreatPosition | null;
+  wordIndices?: number[];
+}
+
+/**
+ * Represents the position of a threat within a document
+ * Similar to HighlightPosition but simpler for threats
+ *
+ * @interface ThreatPosition
+ * @property {number} pageNumber - Page number where threat is located
+ * @property {number} startOffset - Starting word index
+ * @property {number} endOffset - Ending word index (exclusive)
+ * @property {string} startXPath - XPath to start node (optional)
+ * @property {string} endXPath - XPath to end node (optional)
+ */
+export interface ThreatPosition {
+  pageNumber: number;
+  startOffset: number;
+  endOffset: number;
+  startXPath?: string;
+  endXPath?: string;
+}
+
+/**
+ * Represents threat analysis results for a single page
+ *
+ * @interface PageThreats
+ * @property {number} page - Page number
+ * @property {Threat[]} threats - Array of threats found on this page
+ * @property {number} totalWords - Total number of words on this page
+ */
+export interface PageThreats {
+  page: number;
+  threats: Threat[];
+  totalWords: number;
+}
+
+/**
+ * Represents the complete threat analysis response
+ *
+ * @interface ThreatAnalysisResult
+ * @property {PageThreats[]} pages - Array of page threat results
+ * @property {number} totalPages - Total number of pages analyzed
+ * @property {number} totalThreats - Total number of threats found
+ */
+export interface ThreatAnalysisResult {
+  pages: PageThreats[];
+  totalPages: number;
+  totalThreats: number;
+}
+
+// ========================================
 // HIGHLIGHT COLOR TYPES
 // ========================================
 
@@ -221,8 +314,60 @@ export const DEFAULT_HIGHLIGHT_COLORS: HighlightColor[] = [
 ];
 
 /**
+ * Threat-specific colors for different severity levels
+ */
+export const THREAT_COLORS: HighlightColor[] = [
+  {
+    id: "threat-critical",
+    name: "Critical Threat",
+    backgroundColor: "rgba(239, 68, 68, 0.3)",
+    borderColor: "rgba(239, 68, 68, 1)",
+    textColor: "rgba(239, 68, 68, 1)",
+  },
+  {
+    id: "threat-high",
+    name: "High Threat",
+    backgroundColor: "rgba(249, 115, 22, 0.3)",
+    borderColor: "rgba(249, 115, 22, 1)",
+    textColor: "rgba(249, 115, 22, 1)",
+  },
+  {
+    id: "threat-medium",
+    name: "Medium Threat",
+    backgroundColor: "rgba(245, 158, 11, 0.3)",
+    borderColor: "rgba(245, 158, 11, 1)",
+    textColor: "rgba(245, 158, 11, 1)",
+  },
+  {
+    id: "threat-low",
+    name: "Low Threat",
+    backgroundColor: "rgba(234, 179, 8, 0.3)",
+    borderColor: "rgba(234, 179, 8, 1)",
+    textColor: "rgba(234, 179, 8, 1)",
+  },
+];
+
+/**
  * The default highlight color (yellow)
  *
  * This is used when no specific color is chosen for a new highlight.
  */
 export const DEFAULT_HIGHLIGHT_COLOR = DEFAULT_HIGHLIGHT_COLORS[0];
+
+/**
+ * Gets the appropriate color for a threat based on severity
+ */
+export const getThreatColor = (severity?: string): HighlightColor => {
+  switch (severity) {
+    case 'critical':
+      return THREAT_COLORS[0];
+    case 'high':
+      return THREAT_COLORS[1];
+    case 'medium':
+      return THREAT_COLORS[2];
+    case 'low':
+      return THREAT_COLORS[3];
+    default:
+      return THREAT_COLORS[1]; // Default to high threat
+  }
+};

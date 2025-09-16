@@ -5,7 +5,7 @@ import PdfContentTab from "@/pdf/PdfContentTab";
 
 export default async function ViewerPage() {
   return (
-    <PDFProvider pdfUrl={"/pdfs/sample.pdf"}>
+    <PDFProvider pdfUrl={"/pdfs/sample2.pdf"}>
       <div className="flex flex-row">
         <PdfContentTab />
         <PdfViewer />

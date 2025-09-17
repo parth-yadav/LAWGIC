@@ -287,8 +287,8 @@ export default function PdfViewer({ className = "" }: { className?: string }) {
           setExplanation(explanationData);
 
           // Save explanation to localStorage
-          if (textLayerRef.current && selection) {
-            // Get the current page element to calculate page-relative position
+          if (selection) {
+            // Get the current page element to ensure we're storing page-relative information
             const currentPageElement = pagesRefs.current?.get(pageNumber);
             let pageTextContent = "";
             let startOffset = -1;
@@ -298,32 +298,35 @@ export default function PdfViewer({ className = "" }: { className?: string }) {
               if (pageTextLayer) {
                 pageTextContent = pageTextLayer.textContent || "";
                 startOffset = pageTextContent.indexOf(selection.selectedText);
+                console.log('Saving explanation for page:', pageNumber);
+                console.log('Page text length:', pageTextContent.length);
+                console.log('Selected text:', `"${selection.selectedText}"`);
+                console.log('Found at page offset:', startOffset);
               }
             }
             
-            // Fallback to global text content if page-specific search fails
-            if (startOffset === -1) {
-              const globalTextContent = textLayerRef.current.textContent || "";
-              startOffset = globalTextContent.indexOf(selection.selectedText);
-            }
-            
-            const endOffset = startOffset + selection.selectedText.length;
+            // Only save if we found the text on the current page
+            if (startOffset !== -1) {
+              const endOffset = startOffset + selection.selectedText.length;
 
-            const storedExplanation: StoredExplanation = {
-              id: `exp-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-              selectedText: selection.selectedText,
-              explanation: explanationData,
-              position: {
-                startOffset,
-                endOffset,
+              const storedExplanation: StoredExplanation = {
+                id: `exp-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+                selectedText: selection.selectedText,
+                explanation: explanationData,
+                position: {
+                  startOffset,
+                  endOffset,
+                  pageNumber
+                },
+                createdAt: new Date().toISOString(),
                 pageNumber
-              },
-              createdAt: new Date().toISOString(),
-              pageNumber
-            };
+              };
 
-            setStoredExplanations(prev => [...prev, storedExplanation]);
-            console.log('Saved explanation:', storedExplanation);
+              setStoredExplanations(prev => [...prev, storedExplanation]);
+              console.log('Saved explanation successfully:', storedExplanation);
+            } else {
+              console.warn('Could not find selected text on current page, not saving explanation');
+            }
           }
         } else {
           console.error("Failed to get explanation:", response.data.error);

@@ -493,49 +493,56 @@ export const PDFProvider = ({
         // Create a temporary visual indicator by finding text spans that contain our text
         const textSpans = Array.from(textLayer.querySelectorAll('span'));
         console.log('Found text spans:', textSpans.length);
+        console.log('Looking for text:', `"${selectedText}"`, 'at position:', explanation.position.startOffset, '-', explanation.position.endOffset);
         
-        // Instead of trying to calculate text positions, let's find spans by matching text content
+        // Get the exact text at the stored position to verify
+        const expectedText = textContent.substring(explanation.position.startOffset, explanation.position.endOffset);
+        console.log('Expected text at position:', `"${expectedText}"`);
+        
+        if (expectedText !== selectedText) {
+          console.warn('Stored text does not match current page text. Page content may have changed.');
+          console.log('Expected:', `"${expectedText}"`, 'Got:', `"${selectedText}"`);
+        }
+        
+        // Strategy: Find spans that cover the exact character range
         const foundSpans: HTMLElement[] = [];
+        let currentOffset = 0;
         
-        // First, try exact text matching
-        for (const span of textSpans) {
+        console.log('Analyzing spans to find exact position match...');
+        
+        for (let i = 0; i < textSpans.length; i++) {
+          const span = textSpans[i];
           const spanText = span.textContent || '';
-          if (spanText.includes(selectedText)) {
+          const spanLength = spanText.length;
+          const spanStart = currentOffset;
+          const spanEnd = currentOffset + spanLength;
+          
+          // Check if this span overlaps with our target range
+          const targetStart = explanation.position.startOffset;
+          const targetEnd = explanation.position.endOffset;
+          
+          const overlapsTarget = !(spanEnd <= targetStart || spanStart >= targetEnd);
+          
+          if (overlapsTarget) {
             foundSpans.push(span as HTMLElement);
-            console.log('Found exact match span:', spanText);
+            console.log(`Span ${i} overlaps target:`, {
+              spanText: `"${spanText}"`,
+              spanRange: `${spanStart}-${spanEnd}`,
+              targetRange: `${targetStart}-${targetEnd}`,
+              overlap: true
+            });
           }
-        }
-        
-        // If no exact matches, try partial matching for multi-span selections
-        if (foundSpans.length === 0) {
-          const words = selectedText.trim().split(/\s+/);
-          console.log('Trying partial matching with words:', words);
           
-          for (const span of textSpans) {
-            const spanText = span.textContent || '';
-            // Check if this span contains any of the words from our selected text
-            if (words.some(word => spanText.includes(word) && word.length > 2)) {
-              foundSpans.push(span as HTMLElement);
-              console.log('Found partial match span:', spanText);
-            }
-          }
-        }
-        
-        // If still no matches, try a more flexible approach
-        if (foundSpans.length === 0) {
-          console.log('No direct matches found, trying flexible search...');
-          const cleanSelectedText = selectedText.replace(/\s+/g, ' ').trim().toLowerCase();
-          
-          for (const span of textSpans) {
-            const spanText = (span.textContent || '').replace(/\s+/g, ' ').trim().toLowerCase();
-            if (spanText && cleanSelectedText.includes(spanText) || spanText.includes(cleanSelectedText)) {
-              foundSpans.push(span as HTMLElement);
-              console.log('Found flexible match span:', span.textContent);
-            }
-          }
+          currentOffset += spanLength;
         }
 
         console.log('Total found spans for highlighting:', foundSpans.length);
+
+        if (foundSpans.length === 0) {
+          console.warn('No target spans found for text:', selectedText);
+          console.log('This might indicate the text is split across multiple spans or has different formatting');
+          return;
+        }
 
         if (foundSpans.length > 0) {
           // Scroll to the first target span

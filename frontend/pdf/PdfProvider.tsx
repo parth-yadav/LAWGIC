@@ -947,15 +947,20 @@ export const PDFProvider = ({
                 if (span.textContent && span.textContent.toLowerCase().includes(threat.text.toLowerCase())) {
                   const threatColor = getThreatColor(threat.severity);
                   
-                  // Create highlight wrapper
+                  // Create highlight wrapper using normal highlight styling
                   const highlightWrapper = document.createElement('span');
-                  highlightWrapper.className = 'pdf-threat-highlight';
+                  highlightWrapper.className = 'text-highlight pdf-threat-highlight';
                   highlightWrapper.setAttribute('data-threat-id', threat.id || `threat-${pageNumber}-${index}`);
                   highlightWrapper.style.backgroundColor = threatColor.backgroundColor;
-                  highlightWrapper.style.borderBottom = `2px solid ${threatColor.borderColor}`;
-                  highlightWrapper.style.cursor = 'pointer';
-                  highlightWrapper.style.borderRadius = '2px';
-                  highlightWrapper.style.padding = '1px 2px';
+                  highlightWrapper.style.transition = "all 0.2s ease";
+                  highlightWrapper.style.position = "relative";
+                  highlightWrapper.style.zIndex = "1";
+                  highlightWrapper.style.cursor = "pointer";
+                  highlightWrapper.style.color = "black";
+                  highlightWrapper.style.fontWeight = "inherit";
+                  if (threatColor.borderColor) {
+                    highlightWrapper.style.borderBottom = `1px solid ${threatColor.borderColor}`;
+                  }
                   highlightWrapper.title = `${threat.severity?.toUpperCase() || 'HIGH'}: ${threat.reason}`;
                   
                   // Replace only the matching part of the text
@@ -997,15 +1002,20 @@ export const PDFProvider = ({
                 if (span.textContent && span.textContent.toLowerCase().includes(threat.text.toLowerCase())) {
                   const threatColor = getThreatColor(threat.severity);
                   
-                  // Create highlight wrapper
+                  // Create highlight wrapper using normal highlight styling
                   const highlightWrapper = document.createElement('span');
-                  highlightWrapper.className = 'pdf-threat-highlight';
+                  highlightWrapper.className = 'text-highlight pdf-threat-highlight';
                   highlightWrapper.setAttribute('data-threat-id', threat.id || `threat-${pageNumber}-${index}`);
                   highlightWrapper.style.backgroundColor = threatColor.backgroundColor;
-                  highlightWrapper.style.borderBottom = `2px solid ${threatColor.borderColor}`;
-                  highlightWrapper.style.cursor = 'pointer';
-                  highlightWrapper.style.borderRadius = '2px';
-                  highlightWrapper.style.padding = '1px 2px';
+                  highlightWrapper.style.transition = "all 0.2s ease";
+                  highlightWrapper.style.position = "relative";
+                  highlightWrapper.style.zIndex = "1";
+                  highlightWrapper.style.cursor = "pointer";
+                  highlightWrapper.style.color = "black";
+                  highlightWrapper.style.fontWeight = "inherit";
+                  if (threatColor.borderColor) {
+                    highlightWrapper.style.borderBottom = `1px solid ${threatColor.borderColor}`;
+                  }
                   highlightWrapper.title = `${threat.severity?.toUpperCase() || 'HIGH'}: ${threat.reason}`;
                   
                   // Wrap the entire span for simplicity in fallback mode

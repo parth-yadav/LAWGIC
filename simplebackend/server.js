@@ -160,7 +160,7 @@ async function analyzePageForThreats(textContent, pageNumber) {
     console.log(`🤖 BACKEND: Text length: ${textContent.length} characters`);
     
     // DEVELOPMENT MODE: Send specific test string as threat
-    const testThreatString = "Policy Period ";
+    const testThreatString = "Emergency Care, provided that";
     
     // Check if the test string exists in the content
     if (textContent.toLowerCase().includes(testThreatString.toLowerCase())) {

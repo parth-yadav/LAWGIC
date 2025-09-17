@@ -146,6 +146,145 @@ export default function PdfThreats() {
   };
 
   /**
+   * Helper interface for text node position mapping
+   */
+  interface TextNodeRange {
+    node: Node;
+    start: number;
+    end: number;
+  }
+
+  /**
+   * Finds and selects text that may span multiple text nodes/divs
+   */
+  const selectTextWordByWord = (root: Node | null, searchText: string): Range | null => {
+    if (!root) return null;
+
+    // Split search text into words, preserving original spacing
+    const words = searchText.split(/(\s+)/); // This keeps whitespace as separate elements
+    if (words.length === 0) return null;
+
+    // Collect all text nodes
+    const walker: TreeWalker = document.createTreeWalker(
+      root,
+      NodeFilter.SHOW_TEXT
+    );
+    const textNodes: Node[] = [];
+    let node: Node | null;
+    while ((node = walker.nextNode())) {
+      if (node.textContent && node.textContent.trim()) {
+        textNodes.push(node);
+      }
+    }
+
+    if (textNodes.length === 0) return null;
+
+    // Build full text with position mapping
+    let fullText = "";
+    const nodeRanges: TextNodeRange[] = [];
+    for (const n of textNodes) {
+      nodeRanges.push({
+        node: n,
+        start: fullText.length,
+        end: fullText.length + (n.textContent?.length ?? 0),
+      });
+      fullText += n.textContent ?? "";
+    }
+
+    // Find all possible starting positions for the first word
+    const firstWord = words[0].trim();
+    const startPositions: number[] = [];
+    let searchFrom = 0;
+
+    while (true) {
+      const pos = fullText
+        .toLowerCase()
+        .indexOf(firstWord.toLowerCase(), searchFrom);
+      if (pos === -1) break;
+      startPositions.push(pos);
+      searchFrom = pos + 1;
+    }
+
+    // Try each starting position
+    for (const startPos of startPositions) {
+      const matchResult = findWordsFromPosition(fullText, words, startPos);
+      if (matchResult) {
+        // Convert positions to node+offset
+        const startNodeInfo = getNodeFromPosition(
+          nodeRanges,
+          matchResult.start
+        );
+        const endNodeInfo = getNodeFromPosition(nodeRanges, matchResult.end);
+
+        if (startNodeInfo && endNodeInfo) {
+          const range = document.createRange();
+          range.setStart(startNodeInfo.node, startNodeInfo.offset);
+          range.setEnd(endNodeInfo.node, endNodeInfo.offset);
+          return range;
+        }
+      }
+    }
+
+    return null;
+  };
+
+  const findWordsFromPosition = (
+    fullText: string,
+    words: string[],
+    startPos: number
+  ): { start: number; end: number } | null => {
+    let currentPos = startPos;
+    const textLower = fullText.toLowerCase();
+
+    for (let i = 0; i < words.length; i++) {
+      const word = words[i];
+
+      if (word.trim() === "") {
+        // It's whitespace, skip over any whitespace in the text
+        while (
+          currentPos < fullText.length &&
+          /\s/.test(fullText[currentPos])
+        ) {
+          currentPos++;
+        }
+        continue;
+      }
+
+      // Look for the word at current position
+      const wordLower = word.toLowerCase();
+      const foundAt = textLower.indexOf(wordLower, currentPos);
+
+      if (foundAt === -1) {
+        return null; // Word not found
+      }
+
+      // Check if this word is reasonably close to where we expect it
+      // Allow some whitespace/punctuation between words
+      const gap = foundAt - currentPos;
+      if (gap > 50) {
+        return null; // Too much gap, probably not the right sequence
+      }
+
+      // Skip to after this word
+      currentPos = foundAt + word.length;
+    }
+
+    return { start: startPos, end: currentPos };
+  };
+
+  const getNodeFromPosition = (
+    nodeRanges: TextNodeRange[],
+    position: number
+  ): { node: Node; offset: number } | null => {
+    for (const { node, start, end } of nodeRanges) {
+      if (position >= start && position <= end) {
+        return { node, offset: position - start };
+      }
+    }
+    return null;
+  };
+
+  /**
    * Converts threat response to Highlight object
    */
   const createHighlightFromThreat = (
@@ -178,77 +317,82 @@ export default function PdfThreats() {
     // Clear any existing selection
     selection.removeAllRanges();
 
-    // Search for the threat text in the page
-    const range = document.createRange();
+    try {
+      // Use the improved word-by-word selection for multi-div text
+      const range = selectTextWordByWord(pageElement, threatText);
+      
+      if (range) {
+        console.log(`🔍 THREATS: Found threat text using word-by-word selection`);
+        
+        // Calculate offsets for the highlight position
+        const startOffset = getTextOffsetInPage(pageElement, range.startContainer, range.startOffset);
+        const endOffset = startOffset + threatText.length;
+        
+        const id = `threat-${Date.now()}-${threatNumber}`;
+        const timestamp = new Date().toISOString();
+        
+        // Determine threat severity and color
+        const severity = determineThreatSeverity(explanation);
+        const color = getThreatColor(severity);
+        
+        const highlight: Highlight = {
+          id,
+          text: threatText,
+          position: {
+            startOffset,
+            endOffset,
+            pageNumber,
+            startPageOffset: startOffset,
+            endPageOffset: endOffset,
+          },
+          color,
+          metadata: {
+            id,
+            text: threatText,
+            note: explanation,
+            tags: ['threat', 'security', severity],
+            createdAt: timestamp,
+            author: 'threat-analyzer'
+          },
+          isActive: false,
+          isTemporary: false,
+        };
+        
+        console.log(`✅ THREATS: Created highlight for "${threatText}" with severity ${severity}`);
+        return highlight;
+        
+      } else {
+        console.log(`⚠️ THREATS: Could not locate threat text "${threatText}" on page ${pageNumber} using word-by-word selection`);
+        return null;
+      }
+      
+    } catch (error) {
+      console.log(`🔍 THREATS: Error creating highlight for "${threatText}":`, error);
+      return null;
+    }
+  };
+
+  /**
+   * Calculate text offset within a page element
+   */
+  const getTextOffsetInPage = (pageElement: Element, targetNode: Node, targetOffset: number): number => {
     const walker = document.createTreeWalker(
       pageElement,
       NodeFilter.SHOW_TEXT,
       null
     );
-
-    let node;
-    let found = false;
-    let startOffset = 0;
+    
     let totalOffset = 0;
-
-    while ((node = walker.nextNode()) && !found) {
-      const textContent = node.textContent || '';
-      const threatIndex = textContent.toLowerCase().indexOf(threatText.toLowerCase());
-      
-      if (threatIndex !== -1) {
-        // Found the threat text
-        try {
-          range.setStart(node, threatIndex);
-          range.setEnd(node, threatIndex + threatText.length);
-          
-          const id = `threat-${Date.now()}-${threatNumber}`;
-          const timestamp = new Date().toISOString();
-          
-          // Determine threat severity and color
-          const severity = determineThreatSeverity(explanation);
-          const color = getThreatColor(severity);
-          
-          const highlight: Highlight = {
-            id,
-            text: threatText,
-            position: {
-              startOffset: totalOffset + threatIndex,
-              endOffset: totalOffset + threatIndex + threatText.length,
-              pageNumber,
-              startPageOffset: threatIndex,
-              endPageOffset: threatIndex + threatText.length,
-            },
-            color,
-            metadata: {
-              id,
-              text: threatText,
-              note: explanation,
-              tags: ['threat', 'security', severity],
-              createdAt: timestamp,
-              author: 'threat-analyzer'
-            },
-            isActive: false,
-            isTemporary: false,
-          };
-          
-          console.log(`✅ THREATS: Created highlight for "${threatText}" with severity ${severity}`);
-          found = true;
-          return highlight;
-          
-        } catch (error) {
-          console.log(`🔍 THREATS: Error creating range for "${threatText}":`, error);
-        }
+    let node;
+    
+    while ((node = walker.nextNode())) {
+      if (node === targetNode) {
+        return totalOffset + targetOffset;
       }
-      
-      totalOffset += textContent.length;
+      totalOffset += node.textContent?.length || 0;
     }
-
-    if (!found) {
-      console.log(`⚠️ THREATS: Could not locate threat text "${threatText}" on page ${pageNumber}`);
-      return null;
-    }
-
-    return null;
+    
+    return totalOffset;
   };
 
   /**
@@ -272,21 +416,11 @@ export default function PdfThreats() {
   };
 
   /**
-   * Gets the appropriate color for threat severity
+   * Gets the appropriate color for threat severity - all threats use red
    */
   const getThreatColor = (severity: string): HighlightColor => {
-    switch (severity) {
-      case 'critical':
-        return THREAT_COLORS[0]; // Critical threat color
-      case 'high':
-        return THREAT_COLORS[1]; // High threat color
-      case 'medium':
-        return THREAT_COLORS[2]; // Medium threat color
-      case 'low':
-        return THREAT_COLORS[3]; // Low threat color
-      default:
-        return THREAT_COLORS[1]; // Default to high threat
-    }
+    // All threats use the same red color regardless of severity
+    return THREAT_COLORS[0];
   };
 
   /**

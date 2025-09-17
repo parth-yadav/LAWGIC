@@ -315,36 +315,32 @@ export const DEFAULT_HIGHLIGHT_COLORS: HighlightColor[] = [
 ];
 
 /**
- * Threat-specific colors for different severity levels
+ * Threat-specific colors - using opaque red highlighting like normal highlights
  */
 export const THREAT_COLORS: HighlightColor[] = [
   {
     id: "threat-critical",
     name: "Critical Threat",
-    backgroundColor: "rgba(239, 68, 68, 0.3)",
-    borderColor: "rgba(239, 68, 68, 1)",
-    textColor: "rgba(239, 68, 68, 1)",
+    backgroundColor: "rgba(255, 0, 0, 1)",
+    borderColor: "rgba(255, 0, 0, 1)",
   },
   {
     id: "threat-high",
     name: "High Threat",
-    backgroundColor: "rgba(249, 115, 22, 0.3)",
-    borderColor: "rgba(249, 115, 22, 1)",
-    textColor: "rgba(249, 115, 22, 1)",
+    backgroundColor: "rgba(255, 0, 0, 1)",
+    borderColor: "rgba(255, 0, 0, 1)",
   },
   {
     id: "threat-medium",
     name: "Medium Threat",
-    backgroundColor: "rgba(245, 158, 11, 0.3)",
-    borderColor: "rgba(245, 158, 11, 1)",
-    textColor: "rgba(245, 158, 11, 1)",
+    backgroundColor: "rgba(255, 0, 0, 1)",
+    borderColor: "rgba(255, 0, 0, 1)",
   },
   {
     id: "threat-low",
     name: "Low Threat",
-    backgroundColor: "rgba(234, 179, 8, 0.3)",
-    borderColor: "rgba(234, 179, 8, 1)",
-    textColor: "rgba(234, 179, 8, 1)",
+    backgroundColor: "rgba(255, 0, 0, 1)",
+    borderColor: "rgba(255, 0, 0, 1)",
   },
 ];
 
@@ -356,19 +352,9 @@ export const THREAT_COLORS: HighlightColor[] = [
 export const DEFAULT_HIGHLIGHT_COLOR = DEFAULT_HIGHLIGHT_COLORS[0];
 
 /**
- * Gets the appropriate color for a threat based on severity
+ * Gets the appropriate color for a threat - all threats use red color
  */
 export const getThreatColor = (severity?: string): HighlightColor => {
-  switch (severity) {
-    case 'critical':
-      return THREAT_COLORS[0];
-    case 'high':
-      return THREAT_COLORS[1];
-    case 'medium':
-      return THREAT_COLORS[2];
-    case 'low':
-      return THREAT_COLORS[3];
-    default:
-      return THREAT_COLORS[1]; // Default to high threat
-  }
+  // All threats use the same red color regardless of severity
+  return THREAT_COLORS[0];
 };

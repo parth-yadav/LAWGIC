@@ -7,38 +7,38 @@ import Link from "next/link";
 
 export default function CTA() {
   return (
-    <section className="py-20 md:py-32 bg-gradient-to-br from-primary/10 via-primary/5 to-background w-full relative">
+    <section className="py-20 md:py-32 bg-gradient-to-br from-[var(--color-scheme-blue)]/10 via-[var(--color-scheme-blue)]/5 to-background dark:to-[var(--color-scheme-darkest)] w-full relative">
       {/* Animated background elements */}
       <div className="absolute inset-0">
-        <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-gradient-to-r from-primary/20 to-blue-600/20 rounded-full blur-3xl animate-pulse"></div>
-        <div className="absolute bottom-1/4 right-1/4 w-80 h-80 bg-gradient-to-r from-blue-600/20 to-purple-600/20 rounded-full blur-3xl animate-pulse delay-1000"></div>
+        <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-gradient-to-r from-[var(--color-scheme-blue)]/20 to-[var(--color-scheme-blue)]/10 rounded-full blur-3xl animate-pulse"></div>
+        <div className="absolute bottom-1/4 right-1/4 w-80 h-80 bg-gradient-to-r from-[var(--color-scheme-blue)]/10 to-[var(--color-scheme-dark-blue)]/10 rounded-full blur-3xl animate-pulse delay-1000"></div>
       </div>
 
       <div className="container px-4 mx-auto relative z-10">
         <div className="max-w-4xl mx-auto text-center">
           <Reveal type="bottomUp" duration={0.8}>
-            <div className="inline-flex items-center px-4 py-2 rounded-full text-sm bg-primary/20 text-primary border border-primary/30 mb-6 hover:bg-primary/30 hover:scale-105 transition-all duration-300">
+            <div className="inline-flex items-center px-4 py-2 rounded-full text-sm bg-[var(--color-scheme-blue)]/20 text-[var(--color-scheme-dark-blue)] dark:text-[var(--color-scheme-blue)] border border-[var(--color-scheme-blue)]/30 mb-6 hover:bg-[var(--color-scheme-blue)]/30 hover:scale-105 transition-all duration-300">
               <ScaleIcon className="w-4 h-4 mr-2 animate-pulse" />
               Ready to Understand Legal Documents?
             </div>
           </Reveal>
 
           <Reveal type="bottomUp" duration={0.8} delay={0.2}>
-            <h2 className="text-3xl md:text-5xl lg:text-6xl font-bold text-foreground mb-6 leading-tight">
+            <h2 className="text-3xl md:text-5xl lg:text-6xl font-bold text-[var(--color-scheme-dark-blue)] dark:text-white mb-6 leading-tight">
               Start Analyzing Documents
-              <span className="block bg-gradient-to-r from-primary via-blue-600 to-purple-600 bg-clip-text text-transparent animate-gradient-x bg-300%">
+              <span className="block bg-gradient-to-r from-[var(--color-scheme-blue)] via-[var(--color-scheme-dark-blue)] to-[var(--color-scheme-darkest)] bg-clip-text text-transparent animate-gradient-x bg-300%">
                 Today
               </span>
             </h2>
           </Reveal>
 
           <Reveal type="bottomUp" duration={0.8} delay={0.4}>
-            <p className="text-xl md:text-2xl text-muted-foreground mb-8 max-w-2xl mx-auto leading-relaxed">
+            <p className="text-xl md:text-2xl text-[var(--color-scheme-dark-blue)]/70 dark:text-gray-300 mb-8 max-w-2xl mx-auto leading-relaxed">
               Join{" "}
-              <span className="text-primary font-bold">thousands of people</span>{" "}
+              <span className="text-[var(--color-scheme-blue)] font-bold">thousands of people</span>{" "}
               who now understand their legal documents.
               Get clear insights in{" "}
-              <span className="text-primary font-bold">minutes, not hours</span>.
+              <span className="text-[var(--color-scheme-blue)] font-bold">minutes, not hours</span>.
             </p>
           </Reveal>
 
@@ -59,7 +59,7 @@ export default function CTA() {
               <Button
                 variant="outline"
                 size="lg"
-                className="group text-lg px-8 py-6 rounded-full border-2 hover:border-primary/50 transition-all duration-300 hover:scale-105 hover:shadow-lg hover:bg-primary/5"
+                className="group text-lg px-8 py-6 rounded-full border-2 hover:border-[var(--color-scheme-blue)]/50 transition-all duration-300 hover:scale-105 hover:shadow-lg hover:bg-[var(--color-scheme-blue)]/5 text-[var(--color-scheme-dark-blue)] dark:text-white border-[var(--color-scheme-blue)]"
               >
                 <ZapIcon className="mr-2 h-5 w-5 group-hover:scale-110 transition-transform duration-300" />
                 See How It Works
@@ -73,30 +73,27 @@ export default function CTA() {
                 { 
                   icon: CheckCircleIcon,
                   title: "Free to Try",
-                  subtitle: "No Credit Card Required",
-                  color: "from-green-500 to-emerald-500"
+                  subtitle: "No Credit Card Required"
                 },
                 {
                   icon: ZapIcon,
                   title: "Instant Results",
-                  subtitle: "Upload & Analyze",
-                  color: "from-yellow-500 to-orange-500"
+                  subtitle: "Upload & Analyze"
                 },
                 {
                   icon: ShieldCheckIcon,
                   title: "Secure & Private",
-                  subtitle: "Your Documents Stay Safe",
-                  color: "from-blue-500 to-cyan-500"
+                  subtitle: "Your Documents Stay Safe"
                 }
-            ].map((feature, index) => (
+            ].map((feature) => (
                 <div key={feature.title} className="group text-center">
-                  <div className={`inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-br ${feature.color} text-white mb-4 group-hover:scale-110 group-hover:rotate-3 transition-all duration-300`}>
+                  <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-br from-[var(--color-scheme-dark-blue)] to-[var(--color-scheme-darkest)] text-white mb-4 group-hover:scale-110 group-hover:rotate-3 transition-all duration-300">
                     <feature.icon className="w-8 h-8" />
                   </div>
-                  <div className="text-sm text-muted-foreground mb-2 group-hover:text-foreground/80 transition-colors duration-300">
+                  <div className="text-sm text-[var(--color-scheme-dark-blue)]/60 dark:text-gray-400 mb-2 group-hover:text-[var(--color-scheme-dark-blue)]/80 dark:group-hover:text-gray-300 transition-colors duration-300">
                     ✓ {feature.title}
                   </div>
-                  <div className="font-semibold text-foreground group-hover:text-primary transition-colors duration-300">
+                  <div className="font-semibold text-[var(--color-scheme-dark-blue)] dark:text-white group-hover:text-[var(--color-scheme-blue)] transition-colors duration-300">
                     {feature.subtitle}
                   </div>
                 </div>

@@ -136,7 +136,6 @@
   }
 }
 
-/* Custom gradient animation */
 @keyframes gradient-x {
   0%, 100% {
     background-position: 0% 50%;
@@ -151,7 +150,6 @@
   background-size: 200% 200%;
 }
 
-/* Floating animation */
 @keyframes float {
   0%, 100% {
     transform: translateY(0px);
@@ -165,7 +163,6 @@
   animation: float 3s ease-in-out infinite;
 }
 
-/* Pulse glow animation */
 @keyframes pulse-glow {
   0%, 100% {
     box-shadow: 0 0 20px rgba(var(--primary), 0.3);

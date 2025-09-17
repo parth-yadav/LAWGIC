@@ -13,11 +13,11 @@ export default function Hero() {
         <div className="text-center max-w-4xl mx-auto">
           <Reveal type="bottomUp" duration={0.8}>
             <div className="flex flex-col sm:flex-row gap-3 justify-center items-center mb-6">
-              <div className="inline-flex items-center px-3 py-1 rounded-full text-sm bg-[var(--color-scheme-dark-blue)]/20 text-[var(--color-scheme-darkest)] border border-[var(--color-scheme-dark-blue)]/30">
+              <div className="inline-flex items-center px-3 py-1 rounded-full text-sm bg-[var(--color-scheme-dark-blue)]/20 text-[var(--color-scheme-darkest)] dark:text-white border border-[var(--color-scheme-dark-blue)]/30">
                 <Cog className="w-4 h-4 mr-2" />
                 Made by byteUS
               </div>
-              <div className="inline-flex items-center px-3 py-1 rounded-full text-sm bg-[var(--color-scheme-dark-blue)]/20 text-[var(--color-scheme-darkest)] border border-[var(--color-scheme-dark-blue)]/30">
+              <div className="inline-flex items-center px-3 py-1 rounded-full text-sm bg-[var(--color-scheme-dark-blue)]/20 text-[var(--color-scheme-darkest)] dark:text-white border border-[var(--color-scheme-dark-blue)]/30">
                 <SparklesIcon className="w-4 h-4 mr-2" />
                 Powered by GEMINI
               </div>

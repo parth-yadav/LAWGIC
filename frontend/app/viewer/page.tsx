@@ -1,16 +1,7 @@
-import PdfToolbar from "@/pdf/PdfToolbar";
-import { PDFProvider } from "../../pdf/PdfProvider";
-import PdfViewer from "@/pdf/PdfViewer";
-import PdfContentTab from "@/pdf/PdfContentTab";
+import PDF from "@/pdf";
 
 export default async function ViewerPage() {
-  return (
-    <PDFProvider pdfUrl={"/pdfs/sample.pdf"}>
-      <div className="flex flex-row">
-        <PdfContentTab />
-        <PdfViewer />
-      </div>
-      <PdfToolbar />
-    </PDFProvider>
-  );
+  const pdfUrl = "/pdfs/sample.pdf";
+
+  return <PDF pdfUrl={pdfUrl} />;
 }

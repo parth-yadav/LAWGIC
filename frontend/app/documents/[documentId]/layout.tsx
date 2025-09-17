@@ -6,7 +6,9 @@ export default async function DocumentLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const user = await getUser();
+  // const user = await getUser();
 
-  return user ? children : <Unauthenticated />;
+  // return user ? children : <Unauthenticated />;
+
+  return children;
 }

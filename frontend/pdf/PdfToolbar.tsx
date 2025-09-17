@@ -16,6 +16,7 @@ import {
   MoreHorizontalIcon,
   CheckIcon,
   HighlighterIcon,
+  MessageSquareIcon,
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -53,7 +54,9 @@ export default function PdfToolbar({ className = "" }: { className?: string }) {
     toolbarPosition,
     setToolbarPosition,
     toggleHighlightsTab,
+    toggleExplanationsTab,
     highlights,
+    storedExplanations,
   } = usePDF();
 
   const handlePageSubmit = (value: string) => {
@@ -170,9 +173,25 @@ export default function PdfToolbar({ className = "" }: { className?: string }) {
             className="h-8 w-8 rounded-full relative"
           >
             <HighlighterIcon className="h-4 w-4" />
-            <span className="absolute -top-1 -right-1 bg-primary text-primary-foreground text-xs font-bold rounded-full px-1">
-              {highlights.length}
-            </span>
+            {highlights.length > 0 && (
+              <span className="absolute -top-1 -right-1 bg-primary text-primary-foreground text-xs font-bold rounded-full px-1">
+                {highlights.length}
+              </span>
+            )}
+          </Button>
+
+          <Button
+            variant="outline"
+            size="icon"
+            onClick={toggleExplanationsTab}
+            className="h-8 w-8 rounded-full relative"
+          >
+            <MessageSquareIcon className="h-4 w-4" />
+            {storedExplanations.length > 0 && (
+              <span className="absolute -top-1 -right-1 bg-primary text-primary-foreground text-xs font-bold rounded-full px-1">
+                {storedExplanations.length}
+              </span>
+            )}
           </Button>
         </div>
 

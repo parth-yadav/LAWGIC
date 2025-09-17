@@ -35,6 +35,7 @@ import { Separator } from "@/components/ui/separator";
 import ApiClient from "@/utils/ApiClient";
 import { start } from "repl";
 import { extractContextText } from "./explain/extractContext";
+import { ExplanationData, StoredExplanation } from "./explanation/types";
 import { set } from "zod";
 import { se } from "date-fns/locale";
 import { toast } from "sonner";
@@ -114,6 +115,8 @@ export default function PdfViewer({ className = "" }: { className?: string }) {
     highlightContextMenu,
     setHighlightContextMenu,
     removeHighlightById,
+    storedExplanations,
+    setStoredExplanations,
   } = usePDF();
 
   // ========================================
@@ -279,9 +282,49 @@ export default function PdfViewer({ className = "" }: { className?: string }) {
         const response = await ApiClient.post("/explain/text", payload);
 
         if (response.data.success) {
-          const explanationData = response.data.data;
+          const explanationData: ExplanationData = response.data.data;
           console.log("Explanation received:", explanationData);
           setExplanation(explanationData);
+
+          // Save explanation to localStorage
+          if (textLayerRef.current && selection) {
+            // Get the current page element to calculate page-relative position
+            const currentPageElement = pagesRefs.current?.get(pageNumber);
+            let pageTextContent = "";
+            let startOffset = -1;
+            
+            if (currentPageElement) {
+              const pageTextLayer = currentPageElement.querySelector('.react-pdf__Page__textContent');
+              if (pageTextLayer) {
+                pageTextContent = pageTextLayer.textContent || "";
+                startOffset = pageTextContent.indexOf(selection.selectedText);
+              }
+            }
+            
+            // Fallback to global text content if page-specific search fails
+            if (startOffset === -1) {
+              const globalTextContent = textLayerRef.current.textContent || "";
+              startOffset = globalTextContent.indexOf(selection.selectedText);
+            }
+            
+            const endOffset = startOffset + selection.selectedText.length;
+
+            const storedExplanation: StoredExplanation = {
+              id: `exp-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+              selectedText: selection.selectedText,
+              explanation: explanationData,
+              position: {
+                startOffset,
+                endOffset,
+                pageNumber
+              },
+              createdAt: new Date().toISOString(),
+              pageNumber
+            };
+
+            setStoredExplanations(prev => [...prev, storedExplanation]);
+            console.log('Saved explanation:', storedExplanation);
+          }
         } else {
           console.error("Failed to get explanation:", response.data.error);
         }
@@ -296,8 +339,8 @@ export default function PdfViewer({ className = "" }: { className?: string }) {
     pageNumber,
     pdfUrl,
     isExplaining,
-    clearSelection,
     textLayerRef,
+    setStoredExplanations,
   ]);
 
   /**

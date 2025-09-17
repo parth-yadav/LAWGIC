@@ -16,6 +16,7 @@ import React, {
 import { LoaderCircleIcon } from "lucide-react";
 import useLocalState from "@/hooks/useLocalState";
 import { Highlight } from "./highlight/types";
+import { StoredExplanation } from "./explanation/types";
 import {
   applyHighlights,
   debounce,
@@ -44,9 +45,10 @@ type PDFContextType = {
   isScrolling: boolean;
   isContentVisible: boolean;
   setIsContentVisible: React.Dispatch<React.SetStateAction<boolean>>;
-  currentContent: "highlights" | null;
-  setCurrentContent: React.Dispatch<React.SetStateAction<"highlights" | null>>;
+  currentContent: "highlights" | "explanations" | null;
+  setCurrentContent: React.Dispatch<React.SetStateAction<"highlights" | "explanations" | null>>;
   toggleHighlightsTab: () => void;
+  toggleExplanationsTab: () => void;
   toolbarPosition: "top" | "bottom";
   setToolbarPosition: React.Dispatch<React.SetStateAction<"top" | "bottom">>;
   onLoadSuccess: ({ numPages }: { numPages: number }) => void;
@@ -81,6 +83,12 @@ type PDFContextType = {
   ) => void;
   jumpToHighlight: (highlight: Highlight) => void;
   applyHighlightsToTextLayer: () => void;
+
+  storedExplanations: StoredExplanation[];
+  setStoredExplanations: React.Dispatch<React.SetStateAction<StoredExplanation[]>>;
+  removeExplanationById: (explanationId: string) => void;
+  clearAllExplanations: () => void;
+  jumpToExplanation: (explanation: StoredExplanation) => void;
 
   highlightContextMenu: {
     highlight: Highlight;
@@ -125,7 +133,7 @@ export const PDFProvider = ({
   const [rotation, setRotation] = useState<number>(0);
   const [isScrolling, setIsScrolling] = useState<boolean>(false);
   const [isContentVisible, setIsContentVisible] = useState<boolean>(false);
-  const [currentContent, setCurrentContent] = useState<"highlights" | null>(
+  const [currentContent, setCurrentContent] = useState<"highlights" | "explanations" | null>(
     null
   );
   const [toolbarPosition, setToolbarPosition] = useLocalState<"top" | "bottom">(
@@ -134,6 +142,10 @@ export const PDFProvider = ({
   );
   const [highlights, setHighlights] = useLocalState<Highlight[]>(
     "highlights",
+    []
+  );
+  const [storedExplanations, setStoredExplanations] = useLocalState<StoredExplanation[]>(
+    "explanations",
     []
   );
   const [highlightContextMenu, setHighlightContextMenu] = useState<{
@@ -388,6 +400,16 @@ export const PDFProvider = ({
     }
   };
 
+  const toggleExplanationsTab = () => {
+    if (currentContent === "explanations" && isContentVisible) {
+      setIsContentVisible(false);
+      setCurrentContent(null);
+    } else {
+      setCurrentContent("explanations");
+      setIsContentVisible(true);
+    }
+  };
+
   const closeContentTab = () => {
     setIsContentVisible(false);
     setCurrentContent(null);
@@ -411,6 +433,165 @@ export const PDFProvider = ({
     });
     setHighlights([]);
   };
+
+  const removeExplanationById = useCallback(
+    (explanationId: string) => {
+      setStoredExplanations((prev) => prev.filter((e) => e.id !== explanationId));
+    },
+    [setStoredExplanations]
+  );
+
+  const clearAllExplanations = () => {
+    setStoredExplanations([]);
+  };
+
+  const jumpToExplanation = useCallback(
+    (explanation: StoredExplanation) => {
+      console.log('jumpToExplanation called with:', explanation);
+      
+      // First, scroll to the correct page using the existing scrollToPage function
+      scrollToPage(explanation.pageNumber, false); // Use smooth scrolling
+      
+      // Wait for page to render and scroll to complete
+      setTimeout(() => {
+        const pageElement = pagesRefs.current?.get(explanation.pageNumber);
+        console.log('Page element found:', !!pageElement, 'for page:', explanation.pageNumber);
+        
+        if (!pageElement) {
+          console.warn('Page element not found for page:', explanation.pageNumber);
+          return;
+        }
+
+        // Find the text layer within this page
+        const textLayer = pageElement.querySelector('.react-pdf__Page__textContent');
+        console.log('Text layer found:', !!textLayer);
+        
+        if (!textLayer) {
+          console.warn('Text layer not found for page:', explanation.pageNumber);
+          // Let's also try to find any text content in the page
+          console.log('Page element children:', pageElement.children);
+          console.log('Page element innerHTML:', pageElement.innerHTML.substring(0, 200));
+          return;
+        }
+
+        const textContent = textLayer.textContent || '';
+        const selectedText = explanation.selectedText;
+        
+        console.log('Text content length:', textContent.length);
+        console.log('Looking for text:', selectedText);
+        
+        // Find the text in the page
+        const startIndex = textContent.indexOf(selectedText);
+        console.log('Text found at index:', startIndex);
+        
+        if (startIndex === -1) {
+          console.warn('Selected text not found in page:', selectedText);
+          console.log('Page text content preview:', textContent.substring(0, 500));
+          return;
+        }
+
+        // Create a temporary visual indicator by finding text spans that contain our text
+        const textSpans = Array.from(textLayer.querySelectorAll('span'));
+        console.log('Found text spans:', textSpans.length);
+        
+        // Instead of trying to calculate text positions, let's find spans by matching text content
+        const foundSpans: HTMLElement[] = [];
+        
+        // First, try exact text matching
+        for (const span of textSpans) {
+          const spanText = span.textContent || '';
+          if (spanText.includes(selectedText)) {
+            foundSpans.push(span as HTMLElement);
+            console.log('Found exact match span:', spanText);
+          }
+        }
+        
+        // If no exact matches, try partial matching for multi-span selections
+        if (foundSpans.length === 0) {
+          const words = selectedText.trim().split(/\s+/);
+          console.log('Trying partial matching with words:', words);
+          
+          for (const span of textSpans) {
+            const spanText = span.textContent || '';
+            // Check if this span contains any of the words from our selected text
+            if (words.some(word => spanText.includes(word) && word.length > 2)) {
+              foundSpans.push(span as HTMLElement);
+              console.log('Found partial match span:', spanText);
+            }
+          }
+        }
+        
+        // If still no matches, try a more flexible approach
+        if (foundSpans.length === 0) {
+          console.log('No direct matches found, trying flexible search...');
+          const cleanSelectedText = selectedText.replace(/\s+/g, ' ').trim().toLowerCase();
+          
+          for (const span of textSpans) {
+            const spanText = (span.textContent || '').replace(/\s+/g, ' ').trim().toLowerCase();
+            if (spanText && cleanSelectedText.includes(spanText) || spanText.includes(cleanSelectedText)) {
+              foundSpans.push(span as HTMLElement);
+              console.log('Found flexible match span:', span.textContent);
+            }
+          }
+        }
+
+        console.log('Total found spans for highlighting:', foundSpans.length);
+
+        if (foundSpans.length > 0) {
+          // Scroll to the first target span
+          foundSpans[0].scrollIntoView({
+            behavior: "smooth",
+            block: "center",
+            inline: "center",
+          });
+
+          console.log('Scrolled to first span, applying visual effects...');
+
+          // Add visual indicator to all target spans
+          foundSpans.forEach((span) => {
+            const originalBackground = span.style.backgroundColor;
+            const originalBoxShadow = span.style.boxShadow;
+            const originalTransition = span.style.transition;
+            const originalZIndex = span.style.zIndex;
+
+            // Apply prominent red box styling
+            span.style.backgroundColor = "rgba(255, 0, 0, 0.3)";
+            span.style.boxShadow = "0 0 0 3px #ff0000, 0 0 12px rgba(255, 0, 0, 0.6)";
+            span.style.transition = "all 0.3s ease";
+            span.style.zIndex = "1000";
+            span.style.position = "relative";
+            
+            console.log('Applied highlighting to span:', span.textContent);
+            
+            // Add shake animation
+            span.animate(
+              [
+                { transform: "translateX(0px)" },
+                { transform: "translateX(-6px)" },
+                { transform: "translateX(6px)" },
+                { transform: "translateX(-6px)" },
+                { transform: "translateX(6px)" },
+                { transform: "translateX(0px)" },
+              ],
+              { duration: 600, easing: "ease-in-out" }
+            );
+
+            // Remove styling after delay
+            setTimeout(() => {
+              span.style.backgroundColor = originalBackground;
+              span.style.boxShadow = originalBoxShadow;
+              span.style.transition = originalTransition;
+              span.style.zIndex = originalZIndex;
+              console.log('Removed highlighting from span:', span.textContent);
+            }, 3000); // Increased duration to 3 seconds
+          });
+        } else {
+          console.warn('No target spans found for text:', selectedText);
+        }
+      }, 800); // Increased timeout to ensure page scroll completes
+    },
+    [pagesRefs, scrollToPage]
+  );
 
   const applyHighlightsToTextLayer = useCallback(
     debounce(() => {
@@ -621,6 +802,7 @@ export const PDFProvider = ({
     currentContent,
     setCurrentContent,
     toggleHighlightsTab,
+    toggleExplanationsTab,
     onLoadSuccess,
     toolbarPosition,
     setToolbarPosition,
@@ -651,6 +833,11 @@ export const PDFProvider = ({
     updateHighlightById,
     jumpToHighlight,
     applyHighlightsToTextLayer,
+    storedExplanations,
+    setStoredExplanations,
+    removeExplanationById,
+    clearAllExplanations,
+    jumpToExplanation,
     highlightContextMenu,
     setHighlightContextMenu,
   };

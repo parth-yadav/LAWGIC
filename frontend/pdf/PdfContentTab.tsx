@@ -10,6 +10,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { XIcon } from "lucide-react";
 import { Separator } from "@/components/ui/separator";
 import PdfHighlights from "./highlight/PdfHighlights";
+import ExplanationsPanel from "./explanation/ExplanationsPanel";
 
 // ========================================
 // MAIN COMPONENT
@@ -81,6 +82,7 @@ export default function PdfContentTab() {
           {/* Content Section - Scrollable */}
           <div className="flex-1 overflow-y-auto overflow-x-hidden p-4 min-h-0 min-w-0">
             {currentContent === "highlights" && <PdfHighlights />}
+            {currentContent === "explanations" && <ExplanationsPanel />}
           </div>
         </motion.div>
       )}

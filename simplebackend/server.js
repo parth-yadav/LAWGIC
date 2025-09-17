@@ -159,41 +159,28 @@ async function analyzePageForThreats(textContent, pageNumber) {
     console.log(`🤖 BACKEND: Analyzing page ${pageNumber} with DEVELOPMENT MODE`);
     console.log(`🤖 BACKEND: Text length: ${textContent.length} characters`);
     
-    // DEVELOPMENT MODE: Create mock threats from 10th-15th words
-    const words = textContent.split(/\s+/).filter(word => word.trim().length > 0);
-    console.log(`🤖 BACKEND: Found ${words.length} words on page ${pageNumber}`);
+    // DEVELOPMENT MODE: Send specific test string as threat
+    const testThreatString = "Policy Period ";
     
-    const mockThreats = [];
-    
-    // Extract words 10-15 as individual threats
-    for (let i = 9; i < Math.min(15, words.length); i++) { // 9-14 (0-indexed) = 10th-15th words
-      const word = words[i];
-      if (word && word.length > 2) { // Only use words longer than 2 characters
-        const threatNumber = i - 8; // 1-6 for threats
-        mockThreats.push({
-          exactStringThreat: word,
-          explanation: `Development mock threat #${threatNumber}: "${word}" detected as potential security risk for testing purposes. This is simulated threat detection to test the frontend highlighting system.`
-        });
-      }
+    // Check if the test string exists in the content
+    if (textContent.toLowerCase().includes(testThreatString.toLowerCase())) {
+      console.log(`🤖 BACKEND: Found test threat string in page ${pageNumber}`);
+      
+      const mockThreats = [{
+        exactStringThreat: testThreatString,
+        explanation: `Development test threat: "${testThreatString}" detected for testing frontend highlighting system. This specific string is used to verify the Selection API integration and highlight creation process.`
+      }];
+      
+      console.log(`🤖 BACKEND: Created 1 mock threat for page ${pageNumber}:`);
+      console.log(`🤖 BACKEND: Mock Threat: "${testThreatString}"`);
+      
+      return mockThreats;
+    } else {
+      console.log(`🤖 BACKEND: Test threat string not found in page ${pageNumber} content`);
+      console.log(`🤖 BACKEND: Searched for: "${testThreatString}"`);
+      console.log(`🤖 BACKEND: In content: "${textContent.substring(0, 200)}..."`);
+      return [];
     }
-    
-    // If we don't have enough words, create some generic mock threats
-    if (mockThreats.length === 0) {
-      const sampleWords = words.slice(0, 5); // Take first 5 words if available
-      sampleWords.forEach((word, index) => {
-        if (word && word.length > 1) {
-          mockThreats.push({
-            exactStringThreat: word,
-            explanation: `Development mock threat from word ${index + 1}: "${word}" flagged for testing purposes.`
-          });
-        }
-      });
-    }
-    
-    console.log(`🤖 BACKEND: Created ${mockThreats.length} mock threats for page ${pageNumber}:`);
-    mockThreats.forEach((threat, index) => {
-      console.log(`🤖 BACKEND: Mock Threat ${index + 1}: "${threat.exactStringThreat}"`);
-    });
     
     // OPTIONAL: Also run real AI analysis for comparison (commented out for development)
     /*
@@ -201,8 +188,6 @@ async function analyzePageForThreats(textContent, pageNumber) {
     const aiThreats = await analyzePageForThreatsWithAI(textContent, pageNumber);
     console.log(`🤖 BACKEND: AI found ${aiThreats.length} real threats vs ${mockThreats.length} mock threats`);
     */
-    
-    return mockThreats;
     
   } catch (error) {
     console.error(`❌ BACKEND: Mock threat analysis error for page ${pageNumber}:`, error);
@@ -376,8 +361,9 @@ app.listen(PORT, () => {
   console.log(`🏥 Health check: GET /health`);
   console.log(`📚 Documentation: GET /`);
   console.log(`🤖 Gemini AI: ${process.env.GEMINI_API_KEY ? 'Configured' : 'NOT CONFIGURED'}`);
-  console.log('� MODE: DEVELOPMENT (Mock threats from 10th-15th words)');
-  console.log('�🚀 ===============================================');
+  console.log('🔧 MODE: DEVELOPMENT (Testing with specific threat string)');
+  console.log('🎯 Test Threat: "with adequate emergency facilities for the"');
+  console.log('🚀 ===============================================');
   console.log('🚀 Ready to analyze PDF content for threats!');
   console.log('🚀 ===============================================\n');
 });

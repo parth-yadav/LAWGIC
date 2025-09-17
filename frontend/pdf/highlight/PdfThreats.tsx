@@ -316,6 +316,11 @@ export default function PdfThreats() {
 
       // Step 2: Send to backend for analysis
       console.log('🔍 THREATS: Step 2 - Sending content to backend for analysis');
+      console.log('🚀 THREATS: EXACT DATA being sent to backend:');
+      console.log(JSON.stringify({ pagesContent }, null, 2));
+      console.log('📊 THREATS: Raw pagesContent array:');
+      console.log(pagesContent);
+      
       const response = await fetch('http://localhost:4000/analyze-pdf-content', {
         method: 'POST',
         headers: {

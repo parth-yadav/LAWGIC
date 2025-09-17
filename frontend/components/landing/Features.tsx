@@ -12,6 +12,7 @@ import {
   ArrowRightIcon,
 } from "lucide-react";
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 
 const features = [
   {
@@ -54,6 +55,11 @@ const features = [
 
 export default function Features() {
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
+  const router = useRouter();
+
+  const handleFeatureClick = () => {
+    router.push("/dashboard");
+  };
 
   return (
     <section id="features" className="py-20 md:py-32 w-full relative bg-[var(--color-scheme-light)] dark:bg-[var(--color-scheme-darkest)]">
@@ -93,6 +99,7 @@ export default function Features() {
                 className="group h-full relative overflow-hidden transition-all duration-500 hover:shadow-2xl hover:shadow-[var(--color-scheme-blue)]/10 border-2 hover:border-[var(--color-scheme-blue)]/30 cursor-pointer bg-white dark:bg-black"
                 onMouseEnter={() => setHoveredIndex(index)}
                 onMouseLeave={() => setHoveredIndex(null)}
+                onClick={handleFeatureClick}
               >
                 {/* Animated background gradient */}
                 <div className="absolute inset-0 bg-gradient-to-br from-[var(--color-scheme-light)] to-[var(--color-scheme-blue)] opacity-0 group-hover:opacity-5 transition-opacity duration-500"></div>

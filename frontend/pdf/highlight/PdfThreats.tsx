@@ -157,12 +157,12 @@ export default function PdfThreats() {
   /**
    * Finds and selects text that may span multiple text nodes/divs
    */
-  const selectTextWordByWord = (root: Node | null, searchText: string): Range | null => {
-    if (!root) return null;
+  const selectTextWordByWord = (root: Node | null, searchText: string): boolean => {
+    if (!root) return false;
 
     // Split search text into words, preserving original spacing
     const words = searchText.split(/(\s+)/); // This keeps whitespace as separate elements
-    if (words.length === 0) return null;
+    if (words.length === 0) return false;
 
     // Collect all text nodes
     const walker: TreeWalker = document.createTreeWalker(
@@ -177,7 +177,7 @@ export default function PdfThreats() {
       }
     }
 
-    if (textNodes.length === 0) return null;
+    if (textNodes.length === 0) return false;
 
     // Build full text with position mapping
     let fullText = "";
@@ -220,12 +220,18 @@ export default function PdfThreats() {
           const range = document.createRange();
           range.setStart(startNodeInfo.node, startNodeInfo.offset);
           range.setEnd(endNodeInfo.node, endNodeInfo.offset);
-          return range;
+
+          const sel = window.getSelection();
+          if (sel) {
+            sel.removeAllRanges();
+            sel.addRange(range);
+            return true;
+          }
         }
       }
     }
 
-    return null;
+    return false;
   };
 
   const findWordsFromPosition = (
@@ -319,14 +325,23 @@ export default function PdfThreats() {
 
     try {
       // Use the improved word-by-word selection for multi-div text
-      const range = selectTextWordByWord(pageElement, threatText);
+      const found = selectTextWordByWord(pageElement, threatText);
       
-      if (range) {
+      if (found) {
         console.log(`🔍 THREATS: Found threat text using word-by-word selection`);
         
-        // Calculate offsets for the highlight position
+        // Get the current selection that was just applied
+        const currentSelection = window.getSelection();
+        if (!currentSelection || currentSelection.rangeCount === 0) {
+          console.log('🔍 THREATS: No active selection found after text selection');
+          return null;
+        }
+        
+        const range = currentSelection.getRangeAt(0);
+        
+        // Calculate offsets for the highlight position using the actual range boundaries
         const startOffset = getTextOffsetInPage(pageElement, range.startContainer, range.startOffset);
-        const endOffset = startOffset + threatText.length;
+        const endOffset = getTextOffsetInPage(pageElement, range.endContainer, range.endOffset);
         
         const id = `threat-${Date.now()}-${threatNumber}`;
         const timestamp = new Date().toISOString();

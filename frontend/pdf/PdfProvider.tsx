@@ -449,153 +449,97 @@ export const PDFProvider = ({
     (explanation: StoredExplanation) => {
       console.log('jumpToExplanation called with:', explanation);
       
-      // First, scroll to the correct page using the existing scrollToPage function
-      scrollToPage(explanation.pageNumber, false); // Use smooth scrolling
+      // First, scroll to the correct page
+      scrollToPage(explanation.pageNumber, false);
       
       // Wait for page to render and scroll to complete
       setTimeout(() => {
         const pageElement = pagesRefs.current?.get(explanation.pageNumber);
-        console.log('Page element found:', !!pageElement, 'for page:', explanation.pageNumber);
-        
         if (!pageElement) {
           console.warn('Page element not found for page:', explanation.pageNumber);
           return;
         }
 
-        // Find the text layer within this page
+        // Find the text layer
         const textLayer = pageElement.querySelector('.react-pdf__Page__textContent');
-        console.log('Text layer found:', !!textLayer);
-        
         if (!textLayer) {
           console.warn('Text layer not found for page:', explanation.pageNumber);
-          // Let's also try to find any text content in the page
-          console.log('Page element children:', pageElement.children);
-          console.log('Page element innerHTML:', pageElement.innerHTML.substring(0, 200));
           return;
         }
 
-        const textContent = textLayer.textContent || '';
-        const selectedText = explanation.selectedText;
-        
-        console.log('Text content length:', textContent.length);
-        console.log('Looking for text:', selectedText);
-        
-        // Find the text in the page
-        const startIndex = textContent.indexOf(selectedText);
-        console.log('Text found at index:', startIndex);
-        
-        if (startIndex === -1) {
-          console.warn('Selected text not found in page:', selectedText);
-          console.log('Page text content preview:', textContent.substring(0, 500));
-          return;
-        }
+        // Create a temporary highlight using the highlight system
+        const tempHighlight: Highlight = {
+          id: `temp-explanation-${explanation.id}`,
+          text: explanation.selectedText,
+          position: {
+            startOffset: explanation.position.startOffset,
+            endOffset: explanation.position.endOffset,
+            pageNumber: explanation.position.pageNumber,
+            startPageOffset: explanation.position.startOffset,
+            endPageOffset: explanation.position.endOffset,
+            startXPath: '', // Not needed for temporary highlight
+            endXPath: '',   // Not needed for temporary highlight
+          },
+          color: {
+            id: "red",
+            name: "Red",
+            backgroundColor: "rgba(255, 0, 0, 0.5)",
+            borderColor: "rgba(200, 0, 0, 0.8)",
+          }, // Red color for explanation highlight
+          metadata: {
+            id: `temp-explanation-${explanation.id}`,
+            text: explanation.selectedText,
+            createdAt: new Date().toISOString(),
+          },
+          isTemporary: true,
+        };
 
-        // Create a temporary visual indicator by finding text spans that contain our text
-        const textSpans = Array.from(textLayer.querySelectorAll('span'));
-        console.log('Found text spans:', textSpans.length);
-        console.log('Looking for text:', `"${selectedText}"`, 'at position:', explanation.position.startOffset, '-', explanation.position.endOffset);
+        console.log('Creating temporary highlight for explanation');
         
-        // Get the exact text at the stored position to verify
-        const expectedText = textContent.substring(explanation.position.startOffset, explanation.position.endOffset);
-        console.log('Expected text at position:', `"${expectedText}"`);
+        // Apply the temporary highlight using the existing highlight system
+        applyHighlights(textLayer as Element, [tempHighlight]);
         
-        if (expectedText !== selectedText) {
-          console.warn('Stored text does not match current page text. Page content may have changed.');
-          console.log('Expected:', `"${expectedText}"`, 'Got:', `"${selectedText}"`);
-        }
-        
-        // Strategy: Find spans that cover the exact character range
-        const foundSpans: HTMLElement[] = [];
-        let currentOffset = 0;
-        
-        console.log('Analyzing spans to find exact position match...');
-        
-        for (let i = 0; i < textSpans.length; i++) {
-          const span = textSpans[i];
-          const spanText = span.textContent || '';
-          const spanLength = spanText.length;
-          const spanStart = currentOffset;
-          const spanEnd = currentOffset + spanLength;
-          
-          // Check if this span overlaps with our target range
-          const targetStart = explanation.position.startOffset;
-          const targetEnd = explanation.position.endOffset;
-          
-          const overlapsTarget = !(spanEnd <= targetStart || spanStart >= targetEnd);
-          
-          if (overlapsTarget) {
-            foundSpans.push(span as HTMLElement);
-            console.log(`Span ${i} overlaps target:`, {
-              spanText: `"${spanText}"`,
-              spanRange: `${spanStart}-${spanEnd}`,
-              targetRange: `${targetStart}-${targetEnd}`,
-              overlap: true
+        // Wait a moment for the highlight to be applied, then find and animate it
+        setTimeout(() => {
+          const highlightElements = Array.from(
+            textLayer.querySelectorAll(`[data-highlight-id="${tempHighlight.id}"]`)
+          ) as HTMLElement[];
+
+          if (highlightElements.length > 0) {
+            console.log('Found temporary highlight elements:', highlightElements.length);
+            
+            // Scroll to the highlight
+            highlightElements[0].scrollIntoView({
+              behavior: "smooth",
+              block: "center",
+              inline: "center",
             });
-          }
-          
-          currentOffset += spanLength;
-        }
 
-        console.log('Total found spans for highlighting:', foundSpans.length);
+            // Flash the highlight with animation
+            highlightElements.forEach((element) => {
+              element.style.boxShadow = "0 0 0 4px #ff0000, 0 0 16px rgba(255, 0, 0, 0.8)";
+              element.style.transition = "box-shadow 0.3s ease";
+              
+              element.animate(
+                [
+                  { transform: "scale(1)" },
+                  { transform: "scale(1.05)" },
+                  { transform: "scale(1)" },
+                ],
+                { duration: 600, easing: "ease-in-out" }
+              );
+            });
 
-        if (foundSpans.length === 0) {
-          console.warn('No target spans found for text:', selectedText);
-          console.log('This might indicate the text is split across multiple spans or has different formatting');
-          return;
-        }
-
-        if (foundSpans.length > 0) {
-          // Scroll to the first target span
-          foundSpans[0].scrollIntoView({
-            behavior: "smooth",
-            block: "center",
-            inline: "center",
-          });
-
-          console.log('Scrolled to first span, applying visual effects...');
-
-          // Add visual indicator to all target spans
-          foundSpans.forEach((span) => {
-            const originalBackground = span.style.backgroundColor;
-            const originalBoxShadow = span.style.boxShadow;
-            const originalTransition = span.style.transition;
-            const originalZIndex = span.style.zIndex;
-
-            // Apply prominent red box styling
-            span.style.backgroundColor = "rgba(255, 0, 0, 0.3)";
-            span.style.boxShadow = "0 0 0 3px #ff0000, 0 0 12px rgba(255, 0, 0, 0.6)";
-            span.style.transition = "all 0.3s ease";
-            span.style.zIndex = "1000";
-            span.style.position = "relative";
-            
-            console.log('Applied highlighting to span:', span.textContent);
-            
-            // Add shake animation
-            span.animate(
-              [
-                { transform: "translateX(0px)" },
-                { transform: "translateX(-6px)" },
-                { transform: "translateX(6px)" },
-                { transform: "translateX(-6px)" },
-                { transform: "translateX(6px)" },
-                { transform: "translateX(0px)" },
-              ],
-              { duration: 600, easing: "ease-in-out" }
-            );
-
-            // Remove styling after delay
+            // Remove the temporary highlight after 3 seconds
             setTimeout(() => {
-              span.style.backgroundColor = originalBackground;
-              span.style.boxShadow = originalBoxShadow;
-              span.style.transition = originalTransition;
-              span.style.zIndex = originalZIndex;
-              console.log('Removed highlighting from span:', span.textContent);
-            }, 3000); // Increased duration to 3 seconds
-          });
-        } else {
-          console.warn('No target spans found for text:', selectedText);
-        }
-      }, 800); // Increased timeout to ensure page scroll completes
+              removeHighlight(textLayer as Element, tempHighlight.id);
+              console.log('Removed temporary explanation highlight');
+            }, 3000);
+          } else {
+            console.warn('No temporary highlight elements found');
+          }
+        }, 200);
+      }, 800);
     },
     [pagesRefs, scrollToPage]
   );

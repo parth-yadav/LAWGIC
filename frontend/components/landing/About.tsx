@@ -53,7 +53,7 @@ export default function About() {
             </div>
           </div>
 
-          <div>
+          {/* <div>
             <Reveal type="rightLeft" duration={0.8} delay={0.4}>
               <Card className="p-8 shadow-2xl border-2 border-secondary/20 bg-card">
                 <CardContent className="p-0">
@@ -103,7 +103,7 @@ export default function About() {
                 </CardContent>
               </Card>
             </Reveal>
-          </div>
+          </div> */}
         </div>
       </div>
     </section>

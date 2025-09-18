@@ -62,7 +62,7 @@ export default function Hero() {
             </div>
           </Reveal>
 
-          <Reveal type="fadeIn" duration={1} delay={0.8} once={true}>
+          {/* <Reveal type="fadeIn" duration={1} delay={0.8} once={true}>
             <div className="mt-16 relative">
               <div className="absolute inset-0 bg-gradient-to-r from-primary/30 to-primary/10 blur-3xl rounded-full"></div>
               <div className="relative bg-card border border-primary/20 rounded-2xl p-8 shadow-2xl">
@@ -94,7 +94,7 @@ export default function Hero() {
                 </div>
               </div>
             </div>
-          </Reveal>
+          </Reveal> */}
         </div>
       </div>
     </section>

@@ -20,5 +20,5 @@ export default function Page({ params }: { params: { documentId: string } }) {
     );
   }
 
-  return <PDF pdfUrl={pdfUrl} />;
+  return <PDF pdfUrl={pdfUrl} className="flex-1" />;
 }

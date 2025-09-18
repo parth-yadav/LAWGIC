@@ -461,7 +461,7 @@ export const PDFProvider = ({
       };
       console.log('📤 FRONTEND: PAYLOAD STRUCTURE:', JSON.stringify(payloadStructure, null, 2));
       
-      const response = await fetch('http://localhost:4000/analyze-highlights', {
+      const response = await fetch('http://localhost:6900/analyze-highlights', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

@@ -470,7 +470,7 @@ export default function PdfThreats() {
       console.log('📊 THREATS: Raw pagesContent array:');
       console.log(pagesContent);
       
-      const response = await fetch('http://localhost:4000/analyze-pdf-content', {
+      const response = await fetch('http://localhost:6900/threats', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -743,7 +743,7 @@ export default function PdfThreats() {
                           {getSeverityIcon(severity)}
                           <div className="flex-1 min-w-0">
                             <div className="font-medium text-sm truncate">
-                              "{threat.text}"
+                              &quot;{threat.text}&quot;
                             </div>
                             <div className="flex items-center gap-2 mt-1">
                               <Badge 
@@ -808,7 +808,7 @@ export default function PdfThreats() {
                 <div>
                   <ShieldAlertIcon className="h-12 w-12 mx-auto mb-2 opacity-50" />
                   <p>No threat analysis yet</p>
-                  <p className="text-xs">Click "Detect Threats" to scan for security threats</p>
+                  <p className="text-xs">Click &quot;Detect Threats&ldquo; to scan for security threats</p>
                 </div>
               ) : searchQuery || selectedSeverity ? (
                 "No threats match your filters"

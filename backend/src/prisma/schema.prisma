@@ -21,6 +21,8 @@ model User {
   refreshTokens RefreshToken[]
   otp           otp?
 
+  documents Document[]
+
   @@map("users")
 }
 
@@ -49,4 +51,80 @@ model otp {
   updatedAt DateTime @updatedAt
 
   @@map("otps")
+}
+
+// #########################
+// NEW
+// ##########################
+
+model Document {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  title     String
+  fileName  String
+  filePath  String
+  fileKey   String
+  pageCount Int
+  deletedAt DateTime?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  threats Threat[]
+  complexTerms   ComplexTerm[]
+  highlights Highlight[]
+
+  @@map("documents")
+}
+
+model Highlight {
+  id          String   @id @default(cuid())
+  documentId  String
+  document    Document @relation(fields: [documentId], references: [id])
+  pageNumber  Int
+  position    Json
+  text        String   
+  color       String   
+  note        String? 
+  explanation String?
+  tags        String[] 
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("highlights")
+}
+
+model ComplexTerm {
+  id          String   @id @default(cuid())
+  documentId  String
+  document    Document @relation(fields: [documentId], references: [id])
+  content     String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("complex_terms")
+}
+
+
+model Threat {
+  id               String      @id @default(cuid())
+  documentId       String
+  document         Document    @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  text             String
+  explanation      String
+  pageNumber       Int
+  threatNumber     Int
+  severity         ThreatSeverity @default(HIGH)
+  category         String?     
+  confidence       Float       @default(1.0)
+  position         Json        
+  createdAt        DateTime    @default(now())
+  updatedAt        DateTime    @updatedAt
+}
+
+enum ThreatSeverity {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
 }

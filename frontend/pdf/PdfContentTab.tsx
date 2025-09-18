@@ -54,34 +54,33 @@ export default function PdfContentTab() {
     <AnimatePresence>
       {isContentVisible && currentContent && (
         <motion.div
-          className="p-2 overflow-hidden w-max bg-card border-r border-border shadow-md"
-          initial={{ width: 0 }}
-          animate={{ width: "auto" }}
-          exit={{ width: 0 }}
-          transition={{ duration: 0.3, ease: "easeInOut" }}
+          className="h-full bg-card border-r border-border shadow-md flex flex-col overflow-hidden"
+          initial={{ width: 0, opacity: 0 }}
+          animate={{ width: 420, opacity: 1 }}
+          exit={{ width: 0, opacity: 0 }}
+          transition={{ duration: 0.4, ease: "easeInOut" }}
         >
-          <div className="flex flex-col h-full w-max">
-            {/* Header Section */}
-            <div className="w-full flex flex-row justify-between items-center gap-4">
-              <span className="text-lg">
-                PDF content:
-                <span className="font-bold ml-2">
-                  {formatContentTitle(currentContent)}
-                </span>
+          {/* Header Section - Sticky within container */}
+          <div className="flex flex-row justify-between items-center gap-4 p-4 bg-card border-b border-border flex-shrink-0 sticky top-0 z-10 min-w-0">
+            <span className="text-lg truncate min-w-0">
+              PDF content:
+              <span className="font-bold ml-2">
+                {formatContentTitle(currentContent)}
               </span>
-              <Button
-                size={"sm"}
-                variant={"destructive"}
-                onClick={closeContentTab}
-                title="Close content panel"
-              >
-                <XIcon />
-              </Button>
-            </div>
-            {/* Content Section */}
-            <div className="flex-1 overflow-auto">
-              {currentContent === "highlights" && <PdfHighlights />}
-            </div>
+            </span>
+            <Button
+              size={"sm"}
+              variant={"destructive"}
+              onClick={closeContentTab}
+              title="Close content panel"
+              className="flex-shrink-0"
+            >
+              <XIcon />
+            </Button>
+          </div>
+          {/* Content Section - Scrollable */}
+          <div className="flex-1 overflow-y-auto overflow-x-hidden p-4 min-h-0 min-w-0">
+            {currentContent === "highlights" && <PdfHighlights />}
           </div>
         </motion.div>
       )}

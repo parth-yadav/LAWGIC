@@ -1,5 +1,4 @@
-import { InfoIcon } from "lucide-react";
-import { FaHome, FaEnvelope } from "react-icons/fa";
+import { FaHome } from "react-icons/fa";
 
 export interface NavBarLinkType {
   name: string;
@@ -12,6 +11,4 @@ export const NavBarLinks: NavBarLinkType[] = [
 ];
 export const QuickLinks: NavBarLinkType[] = [
   { name: "Home", href: "/", icon: FaHome },
-  { name: "Contact Us", href: "/contact", icon: FaEnvelope },
-  { name: "About Us", href: "/aboutus", icon: InfoIcon },
 ];

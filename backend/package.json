@@ -14,6 +14,7 @@
     "clean": "rm -rf build"
   },
   "dependencies": {
+    "@google/genai": "^1.19.0",
     "@prisma/client": "^6.14.0",
     "@types/axios": "^0.9.36",
     "@types/bcrypt": "^6.0.0",

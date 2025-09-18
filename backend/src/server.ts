@@ -3,8 +3,8 @@ import cors from "cors";
 import dotenv from "dotenv";
 import cookieParser from "cookie-parser";
 import authRouter from "./routes/auth.routes";
-import { clientBaseUrl } from "./utils/auth";
 import validateEnv from "./utils/validateEnv";
+import explainRouter from "./routes/explain.routes";
 
 dotenv.config();
 
@@ -14,7 +14,10 @@ const PORT = process.env.PORT || 6900;
 
 app.use(
   cors({
-    origin: clientBaseUrl,
+    origin: (origin, callback) => {
+      if (!origin) return callback(null, true);
+      return callback(null, origin);
+    },
     credentials: true,
   })
 );
@@ -28,6 +31,7 @@ app.get("/", (_req, res) => {
 });
 
 app.use("/auth", authRouter);
+app.use("/explain", explainRouter);
 
 validateEnv()
   .then(() => {

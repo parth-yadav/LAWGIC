@@ -21,7 +21,6 @@ import { Button } from "@/components/ui/button";
 import {
   DEFAULT_HIGHLIGHT_COLOR,
   DEFAULT_HIGHLIGHT_COLORS,
-  Highlight,
   HighlightColor,
 } from "./highlight/types";
 import useLocalState from "@/hooks/useLocalState";
@@ -33,11 +32,8 @@ import {
 import { createHighlightFromSelection } from "./highlight/utils";
 import { Separator } from "@/components/ui/separator";
 import ApiClient from "@/utils/ApiClient";
-import { start } from "repl";
 import { extractContextText } from "./explain/extractContext";
 import { ExplanationData, StoredExplanation } from "./explanation/types";
-import { set } from "zod";
-import { se } from "date-fns/locale";
 import { toast } from "sonner";
 
 // ========================================
@@ -115,7 +111,6 @@ export default function PdfViewer({ className = "" }: { className?: string }) {
     highlightContextMenu,
     setHighlightContextMenu,
     removeHighlightById,
-    storedExplanations,
     setStoredExplanations,
   } = usePDF();
 
@@ -158,7 +153,7 @@ export default function PdfViewer({ className = "" }: { className?: string }) {
    * Creates selection state for context menu positioning
    */
   const handleMouseUp = useCallback(
-    (e: MouseEvent) => {
+    () => {
       const browserSelection = window.getSelection();
       const selectedText = browserSelection?.toString();
 
@@ -181,7 +176,6 @@ export default function PdfViewer({ className = "" }: { className?: string }) {
 
       // Check if the start of the selection is above the visible area
       const isStartAboveViewport = selectionRect.top < containerRect.top;
-      const isStartBelowViewport = selectionRect.bottom > containerRect.bottom;
 
       // Determine if we should show the menu below the selection
       const shouldShowBelow = isStartAboveViewport || selectionRect.top < 80; // 80px buffer for menu height
@@ -286,7 +280,7 @@ export default function PdfViewer({ className = "" }: { className?: string }) {
           console.log("Explanation received:", explanationData);
           setExplanation(explanationData);
 
-          // Save explanation to localStorage
+          // Saving to localStorage
           if (selection) {
             // Get the current page element to ensure we're storing page-relative information
             const currentPageElement = pagesRefs.current?.get(pageNumber);
@@ -298,6 +292,7 @@ export default function PdfViewer({ className = "" }: { className?: string }) {
               if (pageTextLayer) {
                 pageTextContent = pageTextLayer.textContent || "";
                 startOffset = pageTextContent.indexOf(selection.selectedText);
+                /* debug logs*/
                 console.log('Saving explanation for page:', pageNumber);
                 console.log('Page text length:', pageTextContent.length);
                 console.log('Selected text:', `"${selection.selectedText}"`);
@@ -305,7 +300,7 @@ export default function PdfViewer({ className = "" }: { className?: string }) {
               }
             }
             
-            // Only save if we found the text on the current page
+            // Only save if we found the text on the current page....will work on this later DW
             if (startOffset !== -1) {
               const endOffset = startOffset + selection.selectedText.length;
 
@@ -328,13 +323,63 @@ export default function PdfViewer({ className = "" }: { className?: string }) {
               console.warn('Could not find selected text on current page, not saving explanation');
             }
           }
+          
+          toast.success("Explanation complete!");
         } else {
-          console.error("Failed to get explanation:", response.data.error);
+          throw new Error(response.data.error?.message || "Failed to get explanation");
         }
-      } catch (error) {
+      } catch (error: unknown) {
         console.error("Error explaining text:", error);
-      } finally {
-        toast.success("Explanation complete !!");
+
+        //type gurading shit (dont mind)
+        const isAxiosError = (err: unknown): err is { response?: { status: number; data?: { error?: { message: string } } } } => {
+          return typeof err === 'object' && err !== null && 'response' in err;
+        };
+
+        // Type guarding shit..normal error
+        const isError = (err: unknown): err is Error => {
+          return err instanceof Error;
+        };
+
+        if(isAxiosError(error)){
+          if (error.response?.status === 503) {
+            toast.error("AI service is busy", {
+              description: "The service is temporarily overloaded. Please try again in a few moments.",
+              action: {
+                label: "Retry",
+                onClick: () => handleExplainText(),
+              },
+            });
+          } else if (error.response?.status === 429) {
+            toast.error("Rate limit exceeded", {
+              description: "Please wait a moment before trying again.",
+            });
+          } else {
+            toast.error("Failed to explain text", {
+              description: error.response?.data?.error?.message || "Please try again later.",
+              action: {
+                label: "Retry",
+                onClick: () => handleExplainText(),
+              },
+            });
+          }
+        }else if(isError(error)){
+          toast.error("Failed to explain text",{
+            description: error.message || "Please try again later.",
+            action:{
+              label: "Retry",
+              onClick: () => handleExplainText(),
+            },
+          });
+        }else{
+          toast.error("failed to explain text",{
+            description: "An unexpected error occurred. Please try again later.",
+            action:{
+              label: "Retry",
+              onClick: () => handleExplainText(),
+            },
+          });
+        }
       }
     });
   }, [
@@ -342,8 +387,8 @@ export default function PdfViewer({ className = "" }: { className?: string }) {
     pageNumber,
     pdfUrl,
     isExplaining,
-    textLayerRef,
     setStoredExplanations,
+    pagesRefs,
   ]);
 
   /**
@@ -384,7 +429,7 @@ export default function PdfViewer({ className = "" }: { className?: string }) {
         clearSelection();
       }
     },
-    [selection, textLayerRef, pageNumber, currentHighlightColor]
+    [selection, textLayerRef, pageNumber, currentHighlightColor, clearSelection, setCurrentHighlightColor, setHighlights]
   );
 
   // Set up event listeners
@@ -409,7 +454,7 @@ export default function PdfViewer({ className = "" }: { className?: string }) {
         selectionCheckInterval.current = null;
       }
     };
-  }, [handleMouseUp, handleClickOutside]);
+  }, [handleMouseUp, handleClickOutside, textLayerRef]);
 
   // Clean up on unmount
   useEffect(() => {

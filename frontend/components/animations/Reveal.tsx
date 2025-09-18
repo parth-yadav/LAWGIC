@@ -1,6 +1,6 @@
 "use client";
 import { motion, useAnimation, useInView } from "framer-motion";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { ReactNode } from "react";
 
@@ -10,6 +10,7 @@ export default function Reveal({
   type = "bottomUp",
   duration = 0.6,
   delay = 0,
+  once = false,
 }: {
   children: ReactNode;
   className?: string;
@@ -22,18 +23,28 @@ export default function Reveal({
     | "fadeIn";
   duration?: number;
   delay?: number;
+  once?: boolean;
 }) {
   const ref = useRef(null);
   const isInView = useInView(ref);
   const controls = useAnimation();
+  const [hasBeenVisible, setHasBeenVisible] = useState(false);
 
   useEffect(() => {
     if (isInView) {
       controls.start("visible");
+      if (once) {
+        setHasBeenVisible(true);
+      }
     } else {
-      controls.set("hidden");
+      if (once && hasBeenVisible) {
+        // Stay visible if once is true and has already been visible
+        controls.set("visible");
+      } else {
+        controls.set("hidden");
+      }
     }
-  }, [isInView, controls]);
+  }, [isInView, controls, once, hasBeenVisible]);
 
   const variants = {
     bottomUp: {

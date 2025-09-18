@@ -9,17 +9,21 @@ export const TextRevealCard = ({
   revealText,
   children,
   className,
+  stayRevealed = false,
 }: {
   text: string;
   revealText: string;
   children?: React.ReactNode;
   className?: string;
+  stayRevealed?: boolean;
 }) => {
   const [widthPercentage, setWidthPercentage] = useState(0);
   const cardRef = useRef<HTMLDivElement | any>(null);
   const [left, setLeft] = useState(0);
   const [localWidth, setLocalWidth] = useState(0);
   const [isMouseOver, setIsMouseOver] = useState(false);
+  const [isRevealed, setIsRevealed] = useState(false);
+  const [lastPosition, setLastPosition] = useState(0);
 
   useEffect(() => {
     if (cardRef.current) {
@@ -36,34 +40,73 @@ export const TextRevealCard = ({
     const { clientX } = event;
     if (cardRef.current) {
       const relativeX = clientX - left;
-      setWidthPercentage((relativeX / localWidth) * 100);
+      const newWidthPercentage = (relativeX / localWidth) * 100;
+      const clampedPercentage = Math.max(0, Math.min(100, newWidthPercentage));
+      
+      setWidthPercentage(clampedPercentage);
+      
+      // Detect swipe direction and toggle state
+      if (clampedPercentage > 80 && lastPosition < clampedPercentage && !isRevealed) {
+        // Swiped left to right, reveal the text
+        setIsRevealed(true);
+      } else if (clampedPercentage < 20 && lastPosition > clampedPercentage && isRevealed) {
+        // Swiped right to left, hide the text
+        setIsRevealed(false);
+      }
+      
+      setLastPosition(clampedPercentage);
     }
   }
 
   function mouseLeaveHandler() {
     setIsMouseOver(false);
-    setWidthPercentage(0);
+    // Don't reset the percentage, maintain the current state
+    setWidthPercentage(isRevealed ? 100 : 0);
   }
+  
   function mouseEnterHandler() {
     setIsMouseOver(true);
+    setLastPosition(isRevealed ? 100 : 0);
   }
+  
   function touchMoveHandler(event: React.TouchEvent<HTMLDivElement>) {
     event.preventDefault();
     const clientX = event.touches[0]!.clientX;
     if (cardRef.current) {
       const relativeX = clientX - left;
-      setWidthPercentage((relativeX / localWidth) * 100);
+      const newWidthPercentage = (relativeX / localWidth) * 100;
+      const clampedPercentage = Math.max(0, Math.min(100, newWidthPercentage));
+      
+      setWidthPercentage(clampedPercentage);
+      
+      // Detect swipe direction and toggle state
+      if (clampedPercentage > 80 && lastPosition < clampedPercentage && !isRevealed) {
+        // Swiped left to right, reveal the text
+        setIsRevealed(true);
+      } else if (clampedPercentage < 20 && lastPosition > clampedPercentage && isRevealed) {
+        // Swiped right to left, hide the text
+        setIsRevealed(false);
+      }
+      
+      setLastPosition(clampedPercentage);
     }
   }
 
+  function touchEndHandler() {
+    setIsMouseOver(false);
+    // Don't reset the percentage, maintain the current state
+    setWidthPercentage(isRevealed ? 100 : 0);
+  }
+
   const rotateDeg = (widthPercentage - 50) * 0.1;
+  
   return (
     <div
       onMouseEnter={mouseEnterHandler}
       onMouseLeave={mouseLeaveHandler}
       onMouseMove={mouseMoveHandler}
       onTouchStart={mouseEnterHandler}
-      onTouchEnd={mouseLeaveHandler}
+      onTouchEnd={touchEndHandler}
       onTouchMove={touchMoveHandler}
       ref={cardRef}
       className={cn(
@@ -78,16 +121,10 @@ export const TextRevealCard = ({
           style={{
             width: "100%",
           }}
-          animate={
-            isMouseOver
-              ? {
-                  opacity: widthPercentage > 0 ? 1 : 0,
-                  clipPath: `inset(0 ${100 - widthPercentage}% 0 0)`,
-                }
-              : {
-                  clipPath: `inset(0 ${100 - widthPercentage}% 0 0)`,
-                }
-          }
+          animate={{
+            opacity: widthPercentage > 0 ? 1 : 0,
+            clipPath: `inset(0 ${100 - widthPercentage}% 0 0)`,
+          }}
           transition={isMouseOver ? { duration: 0 } : { duration: 0.4 }}
           className="absolute bg-background backdrop-blur-sm z-20 will-change-transform"
         >

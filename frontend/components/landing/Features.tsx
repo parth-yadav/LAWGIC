@@ -112,11 +112,11 @@ export default function Features() {
     const gapX = 40;
     const gapY = 60;
     
-    // Calculate total grid dimensions
+    // Calculate positions relative to center (0,0)
     const totalWidth = (cardWidth * cols) + (gapX * (cols - 1));
     const totalHeight = (cardHeight * 2) + gapY; // 2 rows for 6 items
     
-    // Center the grid by starting from negative half of total dimensions
+    // Start from negative half to center the grid around (0,0)
     const startX = -totalWidth / 2 + cardWidth / 2;
     const startY = -totalHeight / 2 + cardHeight / 2;
     
@@ -268,10 +268,10 @@ export default function Features() {
         </div>
 
         {/* Features Container */}
-        <div className="relative w-full min-h-[600px] flex items-center justify-center">
+        <div className="relative w-full min-h-[800px] flex items-center justify-center">
           {/* Rotating ring container */}
           <motion.div
-            className="relative"
+            className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2"
             animate={ringControls}
             style={{
               originX: 0.5,
@@ -291,6 +291,8 @@ export default function Features() {
                   originX: 0.5,
                   originY: 0.5,
                   zIndex: 10,
+                  left: -160, // Half of max width (320px) to center the expanded cards
+                  top: -120,  // Half of max height (240px) to center the expanded cards
                 }}
               >
               <div 

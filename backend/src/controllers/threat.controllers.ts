@@ -70,35 +70,49 @@ async function analyzePageForThreatsWithAI(textContent: string, pageNumber: numb
     try {
         console.log(`🤖 BACKEND: Running REAL AI analysis for page ${pageNumber}`);
 
-        const prompt = `Analyze the following text for cybersecurity threats and vulnerabilities. 
+        const prompt = `Analyze the following legal document text for potentially problematic clauses, unfavorable terms, and legal risks. 
     Focus on detecting:
-    - SQL injection patterns
-    - Cross-site scripting (XSS)
-    - Command injection
-    - Path traversal attempts
-    - Hardcoded credentials or API keys
-    - Security misconfigurations
-    - Malicious URLs or IPs
-    - Social engineering patterns
+    - Liability limitations that may disadvantage the reader
+    - Indemnification clauses that shift excessive risk
+    - Termination clauses with unfavorable conditions
+    - Payment terms with hidden fees or penalties
+    - Intellectual property assignments that are overly broad
+    - Confidentiality clauses that are one-sided
+    - Dispute resolution clauses that limit legal remedies
+    - Force majeure clauses that are too restrictive
+    - Warranty disclaimers that eliminate important protections
+    - Automatic renewal clauses with difficult opt-out terms
+    - Jurisdiction clauses that create inconvenience
+    - Penalty clauses with excessive damages
+    - Non-compete or non-solicitation clauses that are overly restrictive
+    - Data handling clauses with insufficient privacy protection
+    - Amendment clauses that allow unilateral changes
     
-    For each threat found, provide:
-    1. The exact string/text that contains the threat
-    2. A detailed explanation of why it's a security concern
-    3. Severity level (Critical, High, Medium, Low)
+    For each problematic clause found, provide:
+    1. The exact text of the problematic clause
+    2. A detailed explanation of why it could be unfavorable or risky
+    3. Risk level (Critical, High, Medium, Low)
+    4. The type of legal issue it represents
+    
+    Risk Level Guidelines:
+    - Critical: Clauses that could result in significant financial loss or legal exposure
+    - High: Terms that heavily favor the other party or limit important rights
+    - Medium: Clauses that are somewhat unfavorable but manageable
+    - Low: Minor issues that should be noted but aren't deal-breakers
     
     Return your response as a JSON object with this structure:
-        {
+    {
         "threats": [
-                {
-                "exactStringThreat": "exact text from input",
-                "explanation": "detailed explanation of the threat",
+            {
+                "exactStringThreat": "exact problematic clause text from input",
+                "explanation": "detailed explanation of why this clause is problematic and what risks it poses",
                 "severity": "Critical|High|Medium|Low",
-                "category": "SQL Injection|XSS|Command Injection|etc"
+                "category": "Liability|Indemnification|Termination|Payment|IP|Confidentiality|Dispute Resolution|Warranty|etc"
             }
         ]
     }
     
-    Text to analyze:
+    Legal document text to analyze:
     ${textContent}`;
 
         const result = await model.generateContent(prompt);

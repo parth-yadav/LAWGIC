@@ -59,19 +59,30 @@ export default function Features() {
   const router = useRouter();
   const isInView = useInView(sectionRef, { amount: 0.8 });
   const controls = useAnimation();
+  const ringControls = useAnimation();
 
   useEffect(() => {
     if (isInView) {
-      // First move to position, then expand after delay
+      // Stop ring rotation and move to positions
+      ringControls.start({ rotate: 0, transition: { duration: 0.5 } });
       controls.start("moveToPosition").then(() => {
         setTimeout(() => {
           controls.start("expanded");
         }, 200); // 0.2 second delay
       });
     } else {
+      // Start ring rotation
+      ringControls.start({ 
+        rotate: 360, 
+        transition: { 
+          duration: 8, 
+          ease: "linear", 
+          repeat: Infinity 
+        } 
+      });
       controls.start("ring");
     }
-  }, [isInView, controls]);
+  }, [isInView, controls, ringControls]);
 
   const handleFeatureClick = () => {
     router.push("/dashboard");
@@ -258,21 +269,30 @@ export default function Features() {
 
         {/* Features Container */}
         <div className="relative w-full min-h-[600px] flex items-center justify-center">
-          {/* Features as balls/cards */}
-          {features.map((feature, index) => (
-            <motion.div
-              key={feature.title}
-              className="absolute"
-              custom={index}
-              variants={ballVariants}
-              initial="ring"
-              animate={controls}
-              style={{
-                originX: 0.5,
-                originY: 0.5,
-                zIndex: 10,
-              }}
-            >
+          {/* Rotating ring container */}
+          <motion.div
+            className="relative"
+            animate={ringControls}
+            style={{
+              originX: 0.5,
+              originY: 0.5,
+            }}
+          >
+            {/* Features as balls/cards */}
+            {features.map((feature, index) => (
+              <motion.div
+                key={feature.title}
+                className="absolute"
+                custom={index}
+                variants={ballVariants}
+                initial="ring"
+                animate={controls}
+                style={{
+                  originX: 0.5,
+                  originY: 0.5,
+                  zIndex: 10,
+                }}
+              >
               <div 
                 className="relative cursor-pointer bg-background/90 backdrop-blur-sm border border-border/50 overflow-hidden"
                 onClick={handleFeatureClick}
@@ -324,6 +344,7 @@ export default function Features() {
               </div>
             </motion.div>
           ))}
+          </motion.div>
         </div>
 
         {/* Scroll indicator */}

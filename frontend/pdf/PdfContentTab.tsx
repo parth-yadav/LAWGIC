@@ -11,6 +11,7 @@ import { XIcon } from "lucide-react";
 import { Separator } from "@/components/ui/separator";
 import PdfHighlights from "./highlight/PdfHighlights";
 import ExplanationsPanel from "./explanation/ExplanationsPanel";
+import PdfThreats from "./highlight/PdfThreats";
 
 // ========================================
 // MAIN COMPONENT
@@ -22,6 +23,7 @@ import ExplanationsPanel from "./explanation/ExplanationsPanel";
  * Renders a collapsible sidebar that displays PDF-related content panels.
  * Currently supports:
  * - Highlights panel: Shows all PDF highlights with management capabilities
+ * - Threats panel: Shows security threats detected in the PDF
  *
  * Features:
  * - Smooth slide-in/out animations
@@ -83,6 +85,7 @@ export default function PdfContentTab() {
           <div className="flex-1 overflow-y-auto overflow-x-hidden p-4 min-h-0 min-w-0">
             {currentContent === "highlights" && <PdfHighlights />}
             {currentContent === "explanations" && <ExplanationsPanel />}
+            {currentContent === "threats" && <PdfThreats />}
           </div>
         </motion.div>
       )}

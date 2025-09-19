@@ -57,18 +57,18 @@ export default function Features() {
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
   const sectionRef = useRef<HTMLElement>(null);
   const router = useRouter();
-  const isInView = useInView(sectionRef, { amount: 0.8 });
+  const isInView = useInView(sectionRef, { amount: 0.7 });
   const controls = useAnimation();
   const ringControls = useAnimation();
 
   useEffect(() => {
     if (isInView) {
       // Stop ring rotation and move to positions
-      ringControls.start({ rotate: 0, transition: { duration: 0.5 } });
+      ringControls.start({ rotate: 0, transition: { duration: 0.2 } });
       controls.start("moveToPosition").then(() => {
         setTimeout(() => {
           controls.start("expanded");
-        }, 200); // 0.2 second delay
+        }, 50); // 0.05 second delay
       });
     } else {
       // Start ring rotation
@@ -138,8 +138,10 @@ export default function Features() {
         borderRadius: "50%",
         width: 80,
         height: 80,
+        left: -40, // Center for 80px circles
+        top: -40,
         transition: { 
-          duration: 0.8, 
+          duration: 0.2, 
           ease: "easeInOut" as const,
           delay: index * 0.1
         }
@@ -155,8 +157,10 @@ export default function Features() {
         borderRadius: "50%",
         width: 80,
         height: 80,
+        left: -40, // Still center for 80px circles
+        top: -40,
         transition: { 
-          duration: 0.8, 
+          duration: 0.2, 
           ease: "easeInOut" as const,
           delay: index * 0.1
         }
@@ -172,6 +176,8 @@ export default function Features() {
         borderRadius: "16px",
         width: 320,
         height: 240,
+        left: -160, // Center for 320px cards
+        top: -120,  // Center for 240px cards
         transition: { 
           duration: 0.5, 
           ease: "easeInOut" as const,
@@ -198,7 +204,7 @@ export default function Features() {
       scale: 1,
       transition: { 
         duration: 0.5,
-        delay: 0.3 // Reduced delay since we already wait 0.2s
+        delay: 0.1 // Reduced delay since we already wait 0.2s
       }
     }
   };
@@ -291,8 +297,6 @@ export default function Features() {
                   originX: 0.5,
                   originY: 0.5,
                   zIndex: 10,
-                  left: -160, // Half of max width (320px) to center the expanded cards
-                  top: -120,  // Half of max height (240px) to center the expanded cards
                 }}
               >
               <div 

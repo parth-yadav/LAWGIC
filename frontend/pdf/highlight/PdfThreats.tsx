@@ -10,11 +10,13 @@ import {
   InfoIcon,
   EyeIcon,
   ScanIcon,
+  DownloadIcon,
 } from "lucide-react";
-import { Threat, PageThreats, DEFAULT_HIGHLIGHT_COLOR, THREAT_COLORS, HighlightColor, Highlight } from "./types";
+import { THREAT_COLORS, HighlightColor, Highlight } from "./types";
 import { cn } from "@/lib/utils";
 import { motion, AnimatePresence } from "framer-motion";
 import { usePDF } from "../PdfProvider";
+import { generateThreatsPDF } from "@/utils/pdfThreatGenerator";
 
 /**
  * PdfThreats Component
@@ -41,14 +43,13 @@ export default function PdfThreats() {
     highlights,
     setHighlights,
     jumpToHighlight,
-    updateHighlightById,
-    removeHighlightById,
   } = usePDF();
 
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedSeverity, setSelectedSeverity] = useState<string | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [analysisProgress, setAnalysisProgress] = useState({ current: 0, total: 0 });
+  const [isDownloading, setIsDownloading] = useState(false);
 
   // ========================================
   // COMPUTED VALUES
@@ -348,7 +349,7 @@ export default function PdfThreats() {
         
         // Determine threat severity and color
         const severity = determineThreatSeverity(explanation);
-        const color = getThreatColor(severity);
+        const color = getThreatColor();
         
         const highlight: Highlight = {
           id,
@@ -433,7 +434,7 @@ export default function PdfThreats() {
   /**
    * Gets the appropriate color for threat severity - all threats use red
    */
-  const getThreatColor = (severity: string): HighlightColor => {
+  const getThreatColor = (): HighlightColor => {
     // All threats use the same red color regardless of severity
     return THREAT_COLORS[0];
   };
@@ -533,6 +534,37 @@ export default function PdfThreats() {
   };
 
   /**
+   * Handles downloading threats as PDF
+   */
+  const handleDownloadThreats = async () => {
+    console.log('📄 Starting threats PDF download...');
+    
+    if (threatHighlights.length === 0) {
+      console.log('⚠️ No threats to download');
+      return;
+    }
+
+    setIsDownloading(true);
+    
+    try {
+      // Extract document name from PDF URL or use default
+      const documentName = pdfUrl ? 
+        pdfUrl.split('/').pop()?.replace('.pdf', '') || 'Document' : 
+        'Document';
+      
+      generateThreatsPDF(threatHighlights, documentName);
+      console.log('✅ Threats PDF downloaded successfully');
+      
+    } catch (error) {
+      console.error('❌ Error downloading threats PDF:', error);
+      // You could add a toast notification here if available
+      alert('Failed to generate PDF. Please try again.');
+    } finally {
+      setIsDownloading(false);
+    }
+  };
+
+  /**
    * Gets the appropriate icon for threat severity
    */
   const getSeverityIcon = (severity?: string) => {
@@ -625,6 +657,26 @@ export default function PdfThreats() {
           <div className="flex items-center gap-2">
             <ScanIcon className="h-4 w-4" />
             Detect Threats
+          </div>
+        )}
+      </Button>
+
+      {/* Download Threats Button */}
+      <Button
+        onClick={handleDownloadThreats}
+        disabled={isDownloading || threatHighlights.length === 0}
+        variant="outline"
+        className="w-full"
+      >
+        {isDownloading ? (
+          <div className="flex items-center gap-2">
+            <DownloadIcon className="h-4 w-4 animate-spin" />
+            Generating PDF...
+          </div>
+        ) : (
+          <div className="flex items-center gap-2">
+            <DownloadIcon className="h-4 w-4" />
+            Download Threats ({threatHighlights.length})
           </div>
         )}
       </Button>
@@ -722,7 +774,7 @@ export default function PdfThreats() {
                     Page {pageNum} ({pageThreats.length} threat{pageThreats.length !== 1 ? 's' : ''})
                   </div>
                   
-                  {pageThreats.map((threat, index) => {
+                  {pageThreats.map((threat) => {
                     const severity = threat.metadata.tags?.find(tag => 
                       ['critical', 'high', 'medium', 'low'].includes(tag.toLowerCase())
                     ) || 'high';

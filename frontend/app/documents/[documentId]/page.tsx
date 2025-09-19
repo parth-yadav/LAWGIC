@@ -4,7 +4,7 @@ import { BanIcon } from "lucide-react";
 export default function Page({ params }: { params: { documentId: string } }) {
   const pdfUrl = (function () {
     if (params.documentId === "test") {
-      return "/pdfs/sample.pdf";
+      return "/pdfs/sample2.pdf";
     }
     return null;
   })();

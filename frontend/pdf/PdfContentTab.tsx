@@ -8,7 +8,6 @@ import { Button } from "@/components/ui/button";
 import { usePDF } from "./PdfProvider";
 import { AnimatePresence, motion } from "framer-motion";
 import { XIcon } from "lucide-react";
-import { Separator } from "@/components/ui/separator";
 import PdfHighlights from "./highlight/PdfHighlights";
 import ExplanationsPanel from "./explanation/ExplanationsPanel";
 import PdfThreats from "./highlight/PdfThreats";

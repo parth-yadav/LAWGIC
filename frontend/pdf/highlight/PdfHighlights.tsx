@@ -265,7 +265,7 @@ export default function PdfHighlights() {
                   onClick={() => jumpToHighlight(highlight)}
                   title="Click to jump to highlight"
                 >
-                  "{highlight.text}"
+                  &quot;{highlight.text}&quot;
                 </div>
 
                 {/* Note Section */}

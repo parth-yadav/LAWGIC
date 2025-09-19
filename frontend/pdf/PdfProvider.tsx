@@ -509,6 +509,7 @@ export const PDFProvider = ({
         // Convert threat highlights to the format expected by PdfThreats component
         const threatsByPage: { [pageNumber: number]: any[] } = {};
         
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         result.threatHighlights.forEach((threatHighlight: any) => {
           const pageNumber = threatHighlight.position?.pageNumber || 1;
           if (!threatsByPage[pageNumber]) {

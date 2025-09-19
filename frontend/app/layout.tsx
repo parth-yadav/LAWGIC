@@ -5,6 +5,7 @@ import { DataProvider } from "@/providers/DataProvider";
 import { ThemeProvider } from "@/providers/ThemeProvider";
 import { cn } from "@/lib/utils";
 import SessionProvider from "@/providers/SessionProvider";
+import { DocumentsProvider } from "@/providers/DocumentsProvider";
 
 export const metadata: Metadata = {
   title: "GenAI",
@@ -18,12 +19,14 @@ export default async function RootLayout({
 }>) {
   return (
     <html lang="en" suppressHydrationWarning className="h-full overflow-hidden">
-      <body className={cn("h-full w-full flex flex-col overflow-hidden")}>
+      <body className={cn("flex h-full w-full flex-col overflow-hidden")}>
         <SessionProvider>
           <DataProvider>
             <ThemeProvider>
-              {children}
-              <Toaster richColors />
+              <DocumentsProvider>
+                {children}
+                <Toaster richColors />
+              </DocumentsProvider>
             </ThemeProvider>
           </DataProvider>
         </SessionProvider>

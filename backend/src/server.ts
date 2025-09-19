@@ -5,6 +5,7 @@ import cookieParser from "cookie-parser";
 import authRouter from "./routes/auth.routes";
 import validateEnv from "./utils/validateEnv";
 import explainRouter from "./routes/explain.routes";
+import documentRouter from "./routes/document.routes";
 
 dotenv.config();
 
@@ -32,6 +33,7 @@ app.get("/", (_req, res) => {
 
 app.use("/auth", authRouter);
 app.use("/explain", explainRouter);
+app.use("/documents", documentRouter);
 
 validateEnv()
   .then(() => {

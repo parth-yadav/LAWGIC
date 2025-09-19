@@ -19,7 +19,7 @@ const DataContext = createContext<DataContextType | undefined>(undefined);
 export const DataProvider = ({ children }: { children: ReactNode }) => {
   const [expanded, setExpanded] = useLocalState<boolean>(
     "navbar_expanded",
-    false
+    false,
   );
   const [loading, setLoading] = useState<boolean>(true);
 
@@ -29,8 +29,8 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
 
   if (loading) {
     return (
-      <div className="w-full h-dvh flex justify-center items-center">
-        <LoaderCircleIcon className="animate-spin size-20" />
+      <div className="flex h-dvh w-full items-center justify-center">
+        <LoaderCircleIcon className="size-20 animate-spin" />
       </div>
     );
   }

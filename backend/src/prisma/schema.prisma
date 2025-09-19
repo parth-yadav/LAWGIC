@@ -7,6 +7,10 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+// #########################
+// User Management
+// ##########################
+
 model User {
   id          String    @id @default(cuid())
   email       String    @unique
@@ -54,7 +58,7 @@ model otp {
 }
 
 // #########################
-// NEW
+// Document Management
 // ##########################
 
 model Document {
@@ -95,16 +99,19 @@ model Highlight {
 }
 
 model ComplexTerm {
-  id          String   @id @default(cuid())
-  documentId  String
-  document    Document @relation(fields: [documentId], references: [id])
-  content     String
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id               String   @id @default(cuid())
+  documentId       String
+  document Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  selectedText     String   @db.Text
+  explanationMeaning String @db.Text
+  pageNumber       Int
+  startOffset      Int
+  endOffset        Int
+  position         Json
+  createdAt        DateTime @default(now())
 
   @@map("complex_terms")
 }
-
 
 model Threat {
   id               String      @id @default(cuid())

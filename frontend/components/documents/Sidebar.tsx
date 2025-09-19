@@ -6,22 +6,31 @@ import { Separator } from "../ui/separator";
 import { motion, AnimatePresence } from "motion/react";
 import useLocalState from "@/hooks/useLocalState";
 import UserButton from "../auth/UserButton";
+import { useDocuments } from "@/providers/DocumentsProvider";
+import { VscFilePdf } from "react-icons/vsc";
+import Link from "next/link";
 
 export default function DocumentSidebar({ className }: { className?: string }) {
   const [expanded, setExpanded] = useLocalState<boolean>(
     "expanded_doc_sidebar",
-    false
+    false,
   );
+
+  const {
+    documents,
+    loading: documentsLoading,
+    error: documentsError,
+  } = useDocuments();
 
   return (
     <nav
       className={cn(
-        "bg-sidebar text-sidebar-foreground border-r border-sidebar-border shadow-md",
-        "flex flex-col p-2 pb-4 h-full gap-2",
-        className
+        "bg-sidebar text-sidebar-foreground border-sidebar-border border-r shadow-md",
+        "flex h-full flex-col gap-2 p-2 pb-4",
+        className,
       )}
     >
-      <div className="flex items-center w-full">
+      <div className="flex w-full items-center">
         <AnimatePresence>
           {expanded && (
             <motion.h1
@@ -37,18 +46,21 @@ export default function DocumentSidebar({ className }: { className?: string }) {
           size={"icon"}
           variant={"ghost"}
           onClick={() => setExpanded((expanded) => !expanded)}
-          className={cn(expanded ? "ml-auto" : "mx-auto")}
+          className={cn(expanded ? "ml-auto" : "mx-auto", "group relative")}
         >
           <PanelLeftOpenIcon className={cn(expanded && "rotate-180")} />
+          <span className="bg-primary text-primary-foreground absolute left-full z-50 max-w-0 origin-left scale-x-0 transform overflow-hidden rounded-lg px-2 py-0.5 font-light opacity-0 transition-all duration-150 ease-in-out group-hover:max-w-xs group-hover:scale-x-100 group-hover:opacity-100">
+            {expanded ? "Collapse" : "Expand"}
+          </span>
         </Button>
       </div>
 
       <Separator />
 
-      <Button variant={"outline"}>
+      <Button variant={"outline"} className="group relative justify-start">
         <LucideLayoutDashboard />
         <AnimatePresence>
-          {expanded && (
+          {expanded ? (
             <motion.span
               initial={{ opacity: 0, width: 0 }}
               animate={{ opacity: 1, width: "auto" }}
@@ -56,9 +68,52 @@ export default function DocumentSidebar({ className }: { className?: string }) {
             >
               Dashboard
             </motion.span>
+          ) : (
+            <span className="bg-primary text-primary-foreground absolute left-full z-50 max-w-0 origin-left scale-x-0 transform overflow-hidden rounded-lg px-2 py-0.5 font-light opacity-0 transition-all duration-150 ease-in-out group-hover:max-w-xs group-hover:scale-x-100 group-hover:opacity-100">
+              Dashboard
+            </span>
           )}
         </AnimatePresence>
       </Button>
+
+      <Separator />
+
+      <div className="flex flex-col gap-1">
+        {documents.map((doc) => (
+          <Link
+            href={`/documents/${doc.id}`}
+            key={doc.id}
+            className="flex w-full justify-start"
+          >
+            <Button
+              key={doc.id}
+              variant={"ghost"}
+              className="group relative w-full justify-start py-6"
+            >
+              <VscFilePdf />
+              <AnimatePresence>
+                {expanded ? (
+                  <motion.div
+                    initial={{ opacity: 0, width: 0 }}
+                    animate={{ opacity: 1, width: "auto" }}
+                    exit={{ opacity: 0, width: 0 }}
+                    className="flex flex-col items-start leading-tight font-light"
+                  >
+                    <span>{doc.title}</span>
+                    <span className="text-muted-foreground text-xs">
+                      {doc.fileName}
+                    </span>
+                  </motion.div>
+                ) : (
+                  <span className="bg-primary text-primary-foreground absolute left-full z-50 max-w-0 origin-left scale-x-0 transform overflow-hidden rounded-lg px-2 py-0.5 font-light opacity-0 transition-all duration-150 ease-in-out group-hover:max-w-xs group-hover:scale-x-100 group-hover:opacity-100">
+                    {doc.title}
+                  </span>
+                )}
+              </AnimatePresence>
+            </Button>
+          </Link>
+        ))}
+      </div>
 
       <div className="flex-1" />
 

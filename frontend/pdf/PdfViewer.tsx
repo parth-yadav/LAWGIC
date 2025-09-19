@@ -108,6 +108,7 @@ export default function PdfViewer({ className = "" }: { className?: string }) {
     toolbarPosition,
     setHighlights,
     applyHighlightsToTextLayer,
+    applyThreatsToTextLayer,
     highlightContextMenu,
     setHighlightContextMenu,
     removeHighlightById,
@@ -456,6 +457,21 @@ export default function PdfViewer({ className = "" }: { className?: string }) {
     };
   }, [handleMouseUp, handleClickOutside, textLayerRef]);
 
+  // ========================================
+  // COMBINED CALLBACKS
+  // ========================================
+
+  /**
+   * Combined callback that applies both highlights and threats when text layer is rendered
+   */
+  const onTextLayerSuccess = useCallback(() => {
+    applyHighlightsToTextLayer();
+    // Add a small delay to ensure the text layer is fully ready
+    setTimeout(() => {
+      applyThreatsToTextLayer();
+    }, 100);
+  }, [applyHighlightsToTextLayer, applyThreatsToTextLayer]);
+
   // Clean up on unmount
   useEffect(() => {
     return () => {
@@ -498,7 +514,7 @@ export default function PdfViewer({ className = "" }: { className?: string }) {
                 width={pdfWidth}
                 renderAnnotationLayer={false}
                 renderTextLayer={true}
-                onRenderTextLayerSuccess={applyHighlightsToTextLayer}
+                onRenderTextLayerSuccess={onTextLayerSuccess}
                 className="border border-border shadow-lg bg-white"
               />
             </div>

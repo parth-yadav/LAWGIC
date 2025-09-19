@@ -63,14 +63,14 @@ export default function Features() {
   return (
     <section
       id="features"
-      className="py-20 md:py-32 w-full relative bg-background overflow-hidden"
+      className=""
     >
       {/* Background decorations */}
-      <div className="absolute inset-0">
+      {/* <div className="absolute inset-0">
         <div className="absolute top-20 left-10 w-32 h-32 bg-secondary/10 rounded-full blur-2xl animate-pulse"></div>
         <div className="absolute bottom-20 right-10 w-40 h-40 bg-primary/5 rounded-full blur-2xl animate-pulse delay-1000"></div>
         <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-96 h-96 bg-secondary/5 rounded-full blur-3xl"></div>
-      </div>
+      </div> */}
 
       <div className="container px-4 mx-auto relative">
         <div className="text-center mb-20">
@@ -91,18 +91,22 @@ export default function Features() {
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-12 lg:gap-16">
-         
           {features.length > 0 ? (
             features.map((feature, index) => (
-              <div
+              <Reveal
                 key={feature.title}
-                className="group relative cursor-pointer bg-red-100 border-2 border-red-500"
-                onMouseEnter={() => setHoveredIndex(index)}
-                onMouseLeave={() => setHoveredIndex(null)}
-                onClick={handleFeatureClick}
+                type="bottomUp"
+                duration={0.6}
+                delay={index * 0.1}
               >
-              {/* Animated background glow */}
-              <div className="absolute -inset-4 bg-gradient-to-r from-primary/20 via-secondary/20 to-primary/20 rounded-2xl opacity-0 group-hover:opacity-100 transition-all duration-700 blur-xl"></div>
+                <div
+                  className="group relative cursor-pointer"
+                  onMouseEnter={() => setHoveredIndex(index)}
+                  onMouseLeave={() => setHoveredIndex(null)}
+                  onClick={handleFeatureClick}
+                >
+                  {/* Animated background glow */}
+                  <div className="absolute -inset-4 bg-gradient-to-r from-primary/20 via-secondary/20 to-primary/20 rounded-2xl opacity-0 group-hover:opacity-100 transition-all duration-700 blur-xl"></div>
               
               <div className="relative p-8 rounded-2xl bg-background/50 backdrop-blur-sm border border-border/50 group-hover:border-secondary/30 transition-all duration-500 group-hover:transform group-hover:scale-105">
                 {/* Icon with accent color */}
@@ -143,11 +147,12 @@ export default function Features() {
                 </div>
               </div>
 
-              {/* Floating particles effect */}
-              <div className="absolute -top-2 -right-2 w-2 h-2 bg-primary/60 rounded-full opacity-0 group-hover:opacity-100 group-hover:animate-ping transition-opacity duration-500"></div>
-              <div className="absolute -bottom-2 -left-2 w-1.5 h-1.5 bg-secondary/60 rounded-full opacity-0 group-hover:opacity-100 group-hover:animate-ping transition-opacity duration-700 delay-200"></div>
-            </div>
-          ))
+                  {/* Floating particles effect */}
+                  <div className="absolute -top-2 -right-2 w-2 h-2 bg-primary/60 rounded-full opacity-0 group-hover:opacity-100 group-hover:animate-ping transition-opacity duration-500"></div>
+                  <div className="absolute -bottom-2 -left-2 w-1.5 h-1.5 bg-secondary/60 rounded-full opacity-0 group-hover:opacity-100 group-hover:animate-ping transition-opacity duration-700 delay-200"></div>
+                </div>
+              </Reveal>
+            ))
           ) : (
             <div className="text-center text-red-500">No features found</div>
           )}

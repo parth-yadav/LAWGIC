@@ -3,6 +3,7 @@ import { Request, Response } from "express";
 import { GoogleGenAI, Type } from "@google/genai";
 import { sendResponse } from "@/utils/ResponseHelpers";
 import { getErrorMessage } from "@/utils/utils";
+import prisma from "@/prisma/client";
 
 const key = process.env.COMPLEX_WORDS_API_KEY;
 
@@ -52,8 +53,19 @@ const makeRequestWithRetry = async (
 
 export const explainText = async (req: Request, res: Response) => {
   try {
-    const { selectionText, currentPageText, prevPageText, nextPageText, page } =
-      req.body;
+    const {
+      selectionText,
+      currentPageText,
+      prevPageText,
+      nextPageText,
+      page,
+      documentId,
+      startOffset,
+      endOffset,
+      position,
+    } = req.body;
+
+    const userId = req.user?.id;
 
     if (!selectionText?.trim()) {
       return sendResponse({
@@ -66,7 +78,63 @@ export const explainText = async (req: Request, res: Response) => {
       });
     }
 
-    const prompt = `
+    if (!documentId) {
+      return sendResponse({
+        res,
+        success: false,
+        error: {
+          message: "Document ID is required",
+        },
+        statusCode: 400,
+      });
+    }
+
+    // Verify user owns the document
+    const document = await prisma.document.findFirst({
+      where: {
+        id: documentId,
+        userId,
+        deletedAt: null,
+      },
+    });
+
+    if (!document) {
+      return sendResponse({
+        res,
+        success: false,
+        error: {
+          message: "Document not found or access denied",
+        },
+        statusCode: 404,
+      });
+    }
+
+    // Check if explanation already exists for this exact text and document
+    const existingExplanation = await prisma.explanation.findFirst({
+      where: {
+        documentId,
+        selectedText: selectionText.trim(),
+        pageNumber: page || 1,
+      },
+    });
+
+    let explanationText: string;
+    let isFromCache = false;
+
+    if (existingExplanation) {
+      // Reuse existing explanation text but create new entry with different position/offset
+      explanationText = existingExplanation.explanationMeaning;
+      isFromCache = true;
+      console.log(
+        `📄 BACKEND: Reusing existing explanation for "${selectionText.trim()}"`
+      );
+    } else {
+      // Generate new explanation using AI
+      console.log(
+        `🤖 BACKEND: Generating new explanation for "${selectionText.trim()}"`
+      );
+
+      const prompt = `
             Act as a helpful legal expert with a talent for making complex topics simple. Your mission is to help ordinary people understand difficult legal documents.
             
             I will provide a JSON payload containing a 'selectionText' (a legal term or phrase), and optionally 'currentPageText', 'prevPageText', and 'nextPageText' for context.
@@ -76,53 +144,78 @@ export const explainText = async (req: Request, res: Response) => {
             The 'term' in your JSON response should be the original 'selectionText', and the 'meaning' should be your simple explanation. Write as if you're explaining it to someone with no legal background. Avoid legal/technical jargon.
     `;
 
-    const payload = {
-      selectionText,
-      currentPageText: currentPageText || "",
-      prevPageText: prevPageText || "",
-      nextPageText: nextPageText || "",
-      page: page || 1,
-    };
+      const payload = {
+        selectionText,
+        currentPageText: currentPageText || "",
+        prevPageText: prevPageText || "",
+        nextPageText: nextPageText || "",
+        page: page || 1,
+      };
 
-    const response = await makeRequestWithRetry(() =>
-      ai.models.generateContent({
-        model: "gemini-2.5-flash",
-        contents: [
-          {
-            role: "user",
-            parts: [
-              {
-                text: prompt + "\n\nJSON payload:\n" + JSON.stringify(payload),
-              },
-            ],
-          },
-        ],
-        config: {
-          responseMimeType: "application/json",
-          responseSchema: {
-            type: Type.OBJECT,
-            properties: {
-              term: { type: Type.STRING },
-              meaning: { type: Type.STRING },
-              page: { type: Type.NUMBER },
+      const response = await makeRequestWithRetry(() =>
+        ai.models.generateContent({
+          model: "gemini-2.5-flash",
+          contents: [
+            {
+              role: "user",
+              parts: [
+                {
+                  text:
+                    prompt + "\n\nJSON payload:\n" + JSON.stringify(payload),
+                },
+              ],
             },
-            propertyOrdering: ["term", "meaning", "page"],
+          ],
+          config: {
+            responseMimeType: "application/json",
+            responseSchema: {
+              type: Type.OBJECT,
+              properties: {
+                term: { type: Type.STRING },
+                meaning: { type: Type.STRING },
+                page: { type: Type.NUMBER },
+              },
+              propertyOrdering: ["term", "meaning", "page"],
+            },
           },
-        },
-      })
-    );
+        })
+      );
 
-    const responseText = response.text ?? "";
-    if (!responseText) {
-      throw new Error("No response text from AI");
+      const responseText = response.text ?? "";
+      if (!responseText) {
+        throw new Error("No response text from AI");
+      }
+      const explanation = JSON.parse(responseText);
+      explanationText = explanation.meaning;
+      isFromCache = false;
     }
-    const explanation = JSON.parse(responseText);
+
+    // Always save a new entry to database (with existing or new explanation text)
+    const savedExplanation = await prisma.explanation.create({
+      data: {
+        documentId,
+        selectedText: selectionText.trim(),
+        explanationMeaning: explanationText,
+        pageNumber: page || 1,
+        startOffset: startOffset || 0,
+        endOffset: endOffset || 0,
+        position: position || {},
+      },
+    });
 
     return sendResponse({
       res,
       success: true,
-      data: explanation,
-      message: "Text explained successfully",
+      data: {
+        term: selectionText.trim(),
+        meaning: explanationText,
+        page: page || 1,
+        id: savedExplanation.id,
+        isFromCache,
+      },
+      message: isFromCache
+        ? "Explanation reused and saved with new position"
+        : "Text explained successfully",
     });
   } catch (error: any) {
     console.error("Error explaining text:", error);
@@ -152,6 +245,83 @@ export const explainText = async (req: Request, res: Response) => {
         details: error,
       },
       statusCode,
+    });
+  }
+};
+
+export const getExplanationsByDocument = async (
+  req: Request,
+  res: Response
+) => {
+  try {
+    const { docId } = req.query;
+    const userId = req.user?.id;
+
+    if (!docId || typeof docId !== "string") {
+      return sendResponse({
+        res,
+        success: false,
+        error: {
+          message: "Document ID is required",
+        },
+        statusCode: 400,
+      });
+    }
+
+    // Verify user owns the document
+    const document = await prisma.document.findFirst({
+      where: {
+        id: docId,
+        userId,
+        deletedAt: null,
+      },
+    });
+
+    if (!document) {
+      return sendResponse({
+        res,
+        success: false,
+        error: {
+          message: "Document not found or access denied",
+        },
+        statusCode: 404,
+      });
+    }
+
+    // Get all explanations for this document
+    const explanations = await prisma.explanation.findMany({
+      where: {
+        documentId: docId,
+      },
+      orderBy: [{ pageNumber: "asc" }, { createdAt: "asc" }],
+    });
+
+    return sendResponse({
+      res,
+      success: true,
+      data: explanations.map((exp) => ({
+        id: exp.id,
+        term: exp.selectedText,
+        meaning: exp.explanationMeaning,
+        page: exp.pageNumber,
+        startOffset: exp.startOffset,
+        endOffset: exp.endOffset,
+        position: exp.position,
+        createdAt: exp.createdAt,
+      })),
+      message: "Explanations retrieved successfully",
+    });
+  } catch (error: any) {
+    console.error("Error getting explanations:", error);
+
+    return sendResponse({
+      res,
+      success: false,
+      error: {
+        message: getErrorMessage(error, "Failed to retrieve explanations"),
+        details: error,
+      },
+      statusCode: 500,
     });
   }
 };

@@ -2,7 +2,6 @@ import { Request, Response } from "express";
 import { z } from "zod";
 import path from "path";
 import { prisma } from "../prisma/client.js";
-import { ApiResponse } from "../types/api.js";
 import {
   uploadToS3,
   generateSignedUrl,

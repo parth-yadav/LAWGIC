@@ -34,7 +34,7 @@ app.get("/", (_req, res) => {
 
 app.use("/auth", authRouter);
 app.use("/documents", documentRouter);
-app.use("/explain", explainRouter);
+app.use("/explanations", explainRouter);
 app.use("/threats", threatRouter);
 
 validateEnv()

@@ -3,11 +3,14 @@ import {
   analyzePdfContent,
   healthCheck,
 } from "@/controllers/threat.controllers";
+import validToken from "@/middlewares/validToken";
 
 const threatRouter = express.Router();
 
-threatRouter.post("/", analyzePdfContent);
+// Main threat analysis endpoint - handles both getting existing and analyzing new
+threatRouter.get("/", validToken, analyzePdfContent);
 
+// Health check doesn't need authentication
 threatRouter.get("/health", healthCheck);
 
 export default threatRouter;

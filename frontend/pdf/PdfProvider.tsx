@@ -91,6 +91,13 @@ type PDFContextType = {
   clearAllExplanations: () => void;
   jumpToExplanation: (explanation: StoredExplanation) => void;
 
+  // Stored threats from localStorage
+  storedThreats: Highlight[];
+  setStoredThreats: React.Dispatch<React.SetStateAction<Highlight[]>>;
+  removeThreatById: (threatId: string) => void;
+  clearAllThreats: () => void;
+  addThreatToStorage: (threat: Highlight) => void;
+
   // Threat detection state and functions
   threats: ThreatAnalysisResult | null;
   setThreats: React.Dispatch<React.SetStateAction<ThreatAnalysisResult | null>>;
@@ -98,7 +105,6 @@ type PDFContextType = {
   setIsAnalyzing: React.Dispatch<React.SetStateAction<boolean>>;
   analyzePdfForThreats: (file: File) => Promise<void>;
   jumpToThreat: (threat: Threat, pageNumber: number) => void;
-  applyThreatsToTextLayer: () => void;
 
   highlightContextMenu: {
     highlight: Highlight;
@@ -156,6 +162,10 @@ export const PDFProvider = ({
   );
   const [storedExplanations, setStoredExplanations] = useLocalState<StoredExplanation[]>(
     "explanations",
+    []
+  );
+  const [storedThreats, setStoredThreats] = useLocalState<Highlight[]>(
+    "threats",
     []
   );
   const [threats, setThreats] = useState<ThreatAnalysisResult | null>(null);
@@ -901,6 +911,33 @@ export const PDFProvider = ({
     setStoredExplanations([]);
   };
 
+  // Threat management functions
+  const removeThreatById = useCallback(
+    (threatId: string) => {
+      if (textLayerRef.current) {
+        removeHighlight(textLayerRef.current, threatId);
+      }
+      setStoredThreats((prev) => prev.filter((t) => t.id !== threatId));
+    },
+    [textLayerRef, setStoredThreats]
+  );
+
+  const clearAllThreats = () => {
+    storedThreats.forEach((threat) => {
+      if (textLayerRef.current) {
+        removeHighlight(textLayerRef.current, threat.id);
+      }
+    });
+    setStoredThreats([]);
+  };
+
+  const addThreatToStorage = useCallback(
+    (threat: Highlight) => {
+      setStoredThreats((prev) => [...prev, threat]);
+    },
+    [setStoredThreats]
+  );
+
   const jumpToExplanation = useCallback(
     (explanation: StoredExplanation) => {
       console.log('jumpToExplanation called with:', explanation);
@@ -1002,16 +1039,21 @@ export const PDFProvider = ({
 
   const applyHighlightsToTextLayer = useCallback(
     debounce(() => {
-      if (!textLayerRef.current || highlights.length === 0) return;
+      if (!textLayerRef.current) return;
+      
+      // Combine regular highlights with stored threats for rendering
+      const allHighlights = [...highlights, ...storedThreats];
+      
+      if (allHighlights.length === 0) return;
 
       try {
-        // Filter valid highlights - apply all highlights for now to debug the issue
-        const validHighlights = highlights.filter((highlight) => {
+        // Filter valid highlights - apply all highlights including threats
+        const validHighlights = allHighlights.filter((highlight) => {
           if (!validateHighlight(highlight)) {
             console.warn("Invalid highlight found:", highlight);
             return false;
           }
-          return true; // Apply all highlights, remove page filtering for now
+          return true;
         });
 
         if (validHighlights.length > 0) {
@@ -1044,7 +1086,7 @@ export const PDFProvider = ({
         console.error("Failed to apply highlights:", error);
       }
     }, 150),
-    [textLayerRef, highlights]
+    [textLayerRef, highlights, storedThreats]
   );
 
 const applyThreatsToTextLayer = useCallback(
@@ -1341,18 +1383,14 @@ const applyThreatsToTextLayer = useCallback(
 
   useEffect(() => {
     applyHighlightsToTextLayer();
-  }, [applyHighlightsToTextLayer, highlights,]);
-
-  useEffect(() => {
-    applyThreatsToTextLayer();
-  }, [applyThreatsToTextLayer, threats]);
+  }, [applyHighlightsToTextLayer, highlights, storedThreats]);
 
   // Add event listener for custom threats-ready event
   useEffect(() => {
     const handleThreatsReady = () => {
       console.log('🎯 FRONTEND: Received threats-ready event, applying highlights...');
       setTimeout(() => {
-        applyThreatsToTextLayer();
+        applyHighlightsToTextLayer();
       }, 100);
     };
 
@@ -1505,13 +1543,17 @@ const applyThreatsToTextLayer = useCallback(
     removeExplanationById,
     clearAllExplanations,
     jumpToExplanation,
+    storedThreats,
+    setStoredThreats,
+    removeThreatById,
+    clearAllThreats,
+    addThreatToStorage,
     threats,
     setThreats,
     isAnalyzing,
     setIsAnalyzing,
     analyzePdfForThreats,
     jumpToThreat,
-    applyThreatsToTextLayer,
     highlightContextMenu,
     setHighlightContextMenu,
   };

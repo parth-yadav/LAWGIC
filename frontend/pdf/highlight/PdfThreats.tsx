@@ -40,8 +40,9 @@ export default function PdfThreats() {
     pdfUrl,
     numPages,
     textLayerRef,
-    highlights,
-    setHighlights,
+    storedThreats,
+    setStoredThreats,
+    addThreatToStorage,
     jumpToHighlight,
   } = usePDF();
 
@@ -56,13 +57,9 @@ export default function PdfThreats() {
   // ========================================
 
   /**
-   * Filter highlights to show only threats (those with threat-related tags)
+   * Filter stored threats to show all threats
    */
-  const threatHighlights = highlights.filter(highlight => 
-    highlight.metadata.tags?.some(tag => 
-      ['threat', 'security', 'critical', 'high', 'medium', 'low'].includes(tag.toLowerCase())
-    )
-  );
+  const threatHighlights = storedThreats;
 
   /**
    * Filter threat highlights based on search query and severity
@@ -509,19 +506,16 @@ export default function PdfThreats() {
         }
       }
 
-      // Step 4: Add threat highlights to existing highlights
+      // Step 4: Add threat highlights to stored threats
       console.log(`🔍 THREATS: Step 4 - Adding ${newThreatHighlights.length} threat highlights`);
       
-      // Remove existing threat highlights first
-      const nonThreatHighlights = highlights.filter(h => 
-        !h.metadata.tags?.some(tag => 
-          ['threat', 'security'].includes(tag.toLowerCase())
-        )
-      );
+      // Clear existing threats first
+      setStoredThreats([]);
       
-      // Combine with new threat highlights
-      const updatedHighlights = [...nonThreatHighlights, ...newThreatHighlights];
-      setHighlights(updatedHighlights);
+      // Add new threat highlights to stored threats
+      newThreatHighlights.forEach(threat => {
+        addThreatToStorage(threat);
+      });
       
       console.log(`✅ THREATS: Analysis complete - Found ${newThreatHighlights.length} threats`);
       

@@ -91,6 +91,13 @@ type PDFContextType = {
   clearAllExplanations: () => void;
   jumpToExplanation: (explanation: StoredExplanation) => void;
 
+  // Stored threats from localStorage
+  storedThreats: Highlight[];
+  setStoredThreats: React.Dispatch<React.SetStateAction<Highlight[]>>;
+  removeThreatById: (threatId: string) => void;
+  clearAllThreats: () => void;
+  addThreatToStorage: (threat: Highlight) => void;
+
   // Threat detection state and functions
   threats: ThreatAnalysisResult | null;
   setThreats: React.Dispatch<React.SetStateAction<ThreatAnalysisResult | null>>;
@@ -98,7 +105,6 @@ type PDFContextType = {
   setIsAnalyzing: React.Dispatch<React.SetStateAction<boolean>>;
   analyzePdfForThreats: (file: File) => Promise<void>;
   jumpToThreat: (threat: Threat, pageNumber: number) => void;
-  applyThreatsToTextLayer: () => void;
 
   highlightContextMenu: {
     highlight: Highlight;
@@ -156,6 +162,10 @@ export const PDFProvider = ({
   );
   const [storedExplanations, setStoredExplanations] = useLocalState<StoredExplanation[]>(
     "explanations",
+    []
+  );
+  const [storedThreats, setStoredThreats] = useLocalState<Highlight[]>(
+    "threats",
     []
   );
   const [threats, setThreats] = useState<ThreatAnalysisResult | null>(null);
@@ -548,6 +558,19 @@ export const PDFProvider = ({
         
         console.log('✅ FRONTEND: Setting threats state:', threatAnalysisResult);
         setThreats(threatAnalysisResult);
+        
+        // Wait a bit for pages to render, then apply threat highlights
+        setTimeout(() => {
+          console.log('🎯 FRONTEND: Triggering threat highlighting after delay...');
+          // Force re-application of threat highlights
+          if (threatAnalysisResult.pages.length > 0) {
+            // Manually trigger applyThreatsToTextLayer since threats state change might not be immediately reflected
+            setTimeout(() => {
+              const event = new CustomEvent('threats-ready');
+              document.dispatchEvent(event);
+            }, 100);
+          }
+        }, 500);
       } else {
         throw new Error('Backend returned invalid result format');
       }
@@ -889,14 +912,41 @@ export const PDFProvider = ({
     setStoredExplanations([]);
   };
 
+  // Threat management functions
+  const removeThreatById = useCallback(
+    (threatId: string) => {
+      if (textLayerRef.current) {
+        removeHighlight(textLayerRef.current, threatId);
+      }
+      setStoredThreats((prev) => prev.filter((t) => t.id !== threatId));
+    },
+    [textLayerRef, setStoredThreats]
+  );
+
+  const clearAllThreats = () => {
+    storedThreats.forEach((threat) => {
+      if (textLayerRef.current) {
+        removeHighlight(textLayerRef.current, threat.id);
+      }
+    });
+    setStoredThreats([]);
+  };
+
+  const addThreatToStorage = useCallback(
+    (threat: Highlight) => {
+      setStoredThreats((prev) => [...prev, threat]);
+    },
+    [setStoredThreats]
+  );
+
   const jumpToExplanation = useCallback(
     (explanation: StoredExplanation) => {
       console.log('jumpToExplanation called with:', explanation);
       
-      // First, scroll to the correct page
+      // Scroll to the correct page and show the full page
       scrollToPage(explanation.pageNumber, false);
       
-      // Wait for page to render and scroll to complete
+      // Wait for page to render and scroll to complete, then apply visual effects
       setTimeout(() => {
         const pageElement = pagesRefs.current?.get(explanation.pageNumber);
         if (!pageElement) {
@@ -911,78 +961,56 @@ export const PDFProvider = ({
           return;
         }
 
-        // Create a temporary highlight using the highlight system
-        const tempHighlight: Highlight = {
-          id: `temp-explanation-${explanation.id}`,
-          text: explanation.selectedText,
-          position: {
-            startOffset: explanation.position.startOffset,
-            endOffset: explanation.position.endOffset,
-            pageNumber: explanation.position.pageNumber,
-            startPageOffset: explanation.position.startOffset,
-            endPageOffset: explanation.position.endOffset,
-            startXPath: '', // Not needed for temporary highlight
-            endXPath: '',   // Not needed for temporary highlight
-          },
-          color: {
-            id: "red",
-            name: "Red",
-            backgroundColor: "rgba(255, 0, 0, 0.5)",
-            borderColor: "rgba(200, 0, 0, 0.8)",
-          }, // Red color for explanation highlight
-          metadata: {
-            id: `temp-explanation-${explanation.id}`,
-            text: explanation.selectedText,
-            createdAt: new Date().toISOString(),
-          },
-          isTemporary: true,
-        };
-
-        console.log('Creating temporary highlight for explanation');
+        // Find text spans containing the explanation text
+        const textSpans = Array.from(textLayer.querySelectorAll('span'));
+        const explanationText = explanation.selectedText.toLowerCase();
         
-        // Apply the temporary highlight using the existing highlight system
-        applyHighlights(textLayer as Element, [tempHighlight]);
-        
-        // Wait a moment for the highlight to be applied, then find and animate it
-        setTimeout(() => {
-          const highlightElements = Array.from(
-            textLayer.querySelectorAll(`[data-highlight-id="${tempHighlight.id}"]`)
-          ) as HTMLElement[];
-
-          if (highlightElements.length > 0) {
-            console.log('Found temporary highlight elements:', highlightElements.length);
-            
-            // Scroll to the highlight
-            highlightElements[0].scrollIntoView({
-              behavior: "smooth",
-              block: "center",
-              inline: "center",
-            });
-
-            // Flash the highlight with animation
-            highlightElements.forEach((element) => {
-              element.style.boxShadow = "0 0 0 4px #ff0000, 0 0 16px rgba(255, 0, 0, 0.8)";
-              element.style.transition = "box-shadow 0.3s ease";
-              
-              element.animate(
-                [
-                  { transform: "scale(1)" },
-                  { transform: "scale(1.05)" },
-                  { transform: "scale(1)" },
-                ],
-                { duration: 600, easing: "ease-in-out" }
-              );
-            });
-
-            // Remove the temporary highlight after 3 seconds
-            setTimeout(() => {
-              removeHighlight(textLayer as Element, tempHighlight.id);
-              console.log('Removed temporary explanation highlight');
-            }, 3000);
-          } else {
-            console.warn('No temporary highlight elements found');
+        // Find spans that contain the explanation text
+        const matchingSpans: HTMLElement[] = [];
+        textSpans.forEach(span => {
+          const spanText = (span.textContent || '').toLowerCase();
+          if (spanText.includes(explanationText)) {
+            matchingSpans.push(span as HTMLElement);
           }
-        }, 200);
+        });
+
+        if (matchingSpans.length > 0) {
+          console.log(`Found ${matchingSpans.length} spans containing explanation text`);
+          
+          // Apply temporary border effect to all matching spans (no scrolling to specific text)
+          matchingSpans.forEach((span) => {
+            // Store original styles
+            const originalBorder = span.style.border;
+            const originalBoxShadow = span.style.boxShadow;
+            const originalTransition = span.style.transition;
+            
+            // Apply temporary border effect
+            span.style.border = "2px solid #ff0000";
+            span.style.boxShadow = "0 0 8px rgba(255, 0, 0, 0.6)";
+            span.style.transition = "all 0.3s ease";
+            
+            // Animate the span
+            span.animate(
+              [
+                { transform: "scale(1)" },
+                { transform: "scale(1.02)" },
+                { transform: "scale(1)" },
+              ],
+              { duration: 600, easing: "ease-in-out" }
+            );
+
+            // Remove the border effect after 2 seconds
+            setTimeout(() => {
+              span.style.border = originalBorder;
+              span.style.boxShadow = originalBoxShadow;
+              span.style.transition = originalTransition;
+            }, 2000);
+          });
+          
+          console.log('Applied temporary border effect to explanation text');
+        } else {
+          console.warn('No spans found containing explanation text:', explanation.selectedText);
+        }
       }, 800);
     },
     [pagesRefs, scrollToPage]
@@ -990,16 +1018,21 @@ export const PDFProvider = ({
 
   const applyHighlightsToTextLayer = useCallback(
     debounce(() => {
-      if (!textLayerRef.current || highlights.length === 0) return;
+      if (!textLayerRef.current) return;
+      
+      // Combine regular highlights with stored threats for rendering
+      const allHighlights = [...highlights, ...storedThreats];
+      
+      if (allHighlights.length === 0) return;
 
       try {
-        // Filter valid highlights - apply all highlights for now to debug the issue
-        const validHighlights = highlights.filter((highlight) => {
+        // Filter valid highlights - apply all highlights including threats
+        const validHighlights = allHighlights.filter((highlight) => {
           if (!validateHighlight(highlight)) {
             console.warn("Invalid highlight found:", highlight);
             return false;
           }
-          return true; // Apply all highlights, remove page filtering for now
+          return true;
         });
 
         if (validHighlights.length > 0) {
@@ -1032,152 +1065,248 @@ export const PDFProvider = ({
         console.error("Failed to apply highlights:", error);
       }
     }, 150),
-    [textLayerRef, highlights]
+    [textLayerRef, highlights, storedThreats]
   );
 
-  const applyThreatsToTextLayer = useCallback(
-    debounce(() => {
-      if (!textLayerRef.current || !threats || threats.pages.length === 0) return;
+const applyThreatsToTextLayer = useCallback(
+  debounce(() => {
+    console.log('🎯 FRONTEND: applyThreatsToTextLayer called');
+    
+    if (!textLayerRef.current || !threats || threats.pages.length === 0) {
+      console.log('🎯 FRONTEND: Early exit - missing requirements:', {
+        textLayerRef: !!textLayerRef.current,
+        threats: !!threats,
+        threatsPages: threats?.pages?.length || 0
+      });
+      return;
+    }
 
-      try {
-        // Remove existing threat highlights first
-        const existingThreatHighlights = document.querySelectorAll('.pdf-threat-highlight');
-        existingThreatHighlights.forEach(el => {
-          const parent = el.parentNode;
-          if (parent) {
-            // Replace the highlight with plain text
-            parent.replaceChild(document.createTextNode(el.textContent || ''), el);
-            // Normalize the parent to merge adjacent text nodes
-            parent.normalize();
-          }
-        });
+    try {
+      // Remove existing threat highlights first
+      const existingThreatHighlights = document.querySelectorAll('.pdf-threat-highlight');
+      console.log(`🎯 FRONTEND: Removing ${existingThreatHighlights.length} existing threat highlights`);
+      existingThreatHighlights.forEach(el => {
+        const parent = el.parentNode;
+        if (parent) {
+          // Replace the highlight with plain text
+          parent.replaceChild(document.createTextNode(el.textContent || ''), el);
+          // Normalize the parent to merge adjacent text nodes
+          parent.normalize();
+        }
+      });
 
-        // Find threats for the current page
-        const currentPageThreats = threats.pages.find(page => page.page === pageNumber);
-        if (!currentPageThreats || currentPageThreats.threats.length === 0) return;
+      // 🔧 FIX: Apply threats to ALL pages, not just current page
+      console.log(`🎯 FRONTEND: Total threat pages to process:`, threats.pages.length);
+      console.log(`🎯 FRONTEND: Threat pages:`, threats.pages.map(p => ({ page: p.page, threats: p.threats.length })));
+      
+      // Check if all required pages are loaded
+      const missingPages = threats.pages.filter(threatPage => {
+        const pageElement = pagesRefs.current?.get(threatPage.page);
+        return !pageElement;
+      });
+      
+      if (missingPages.length > 0) {
+        console.warn(`🎯 FRONTEND: Missing page elements for pages: ${missingPages.map(p => p.page).join(', ')}. Retrying in 1 second...`);
+        setTimeout(() => {
+          applyThreatsToTextLayer();
+        }, 1000);
+        return;
+      }
+      
+      threats.pages.forEach(threatPage => {
+        console.log(`🎯 FRONTEND: Processing page ${threatPage.page}...`);
+        
+        const pageElement = pagesRefs.current?.get(threatPage.page);
+        if (!pageElement) {
+          console.error(`🎯 FRONTEND: Page element for page ${threatPage.page} NOT FOUND in pagesRefs`);
+          console.log(`🎯 FRONTEND: Available page refs:`, Array.from(pagesRefs.current?.keys() || []));
+          return;
+        }
+        
+        if (threatPage.threats.length === 0) {
+          console.log(`🎯 FRONTEND: No threats for page ${threatPage.page}`);
+          return;
+        }
 
-        // Apply highlights for current page threats that have position information
-        const pageElement = pagesRefs.current?.get(pageNumber);
-        if (pageElement) {
-          currentPageThreats.threats.forEach((threat, index) => {
-            console.log(`🎯 FRONTEND: Processing threat for highlighting:`, {
-              id: threat.id,
-              text: threat.text,
-              position: threat.position,
-              hasHighlightData: !!threat._highlightData
-            });
+        console.log(`🎯 FRONTEND: Applying threats to page ${threatPage.page}:`, threatPage.threats.length);
+        
+        // Check if page element has text content
+        const textLayer = pageElement.querySelector('.react-pdf__Page__textContent');
+        if (!textLayer) {
+          console.error(`🎯 FRONTEND: Text layer not found for page ${threatPage.page}`);
+          return;
+        }
+        
+        const textSpansInPage = textLayer.querySelectorAll('span');
+        console.log(`🎯 FRONTEND: Page ${threatPage.page} has ${textSpansInPage.length} text spans`);
+        
+        if (textSpansInPage.length === 0) {
+          console.error(`🎯 FRONTEND: No text spans found in page ${threatPage.page}`);
+          return;
+        }
 
-            // Try multiple approaches to find the threat text in the PDF
-            let highlightApplied = false;
+        threatPage.threats.forEach((threat, index) => {
+          console.log(`🎯 FRONTEND: Processing threat ${index + 1}/${threatPage.threats.length} for page ${threatPage.page}:`, {
+            id: threat.id,
+            text: threat.text.substring(0, 100) + '...',
+            textLength: threat.text.length,
+            position: threat.position,
+            hasHighlightData: !!threat._highlightData
+          });
 
-            // Approach 1: Use the _highlightData if available (from backend)
-            if (threat._highlightData && threat._highlightData.position) {
-              console.log(`🎯 FRONTEND: Using _highlightData position:`, threat._highlightData.position);
+          // Try multiple approaches to find the threat text in the PDF
+          let highlightApplied = false;
+
+          // Approach 1: Use the _highlightData if available (from backend)
+          if (threat._highlightData && threat._highlightData.position) {
+            console.log(`🎯 FRONTEND: Using _highlightData position:`, threat._highlightData.position);
+            
+            // Try to find the text span that matches the position
+            const textSpans = pageElement.querySelectorAll('.react-pdf__Page__textContent span');
+            console.log(`🎯 FRONTEND: Page ${threatPage.page} has ${textSpans.length} spans to search`);
+            
+            let foundSpan = false;
+            Array.from(textSpans).forEach((span, spanIndex) => {
+              const spanText = span.textContent || '';
+              const containsThreat = spanText.toLowerCase().includes(threat.text.toLowerCase());
               
-              // Try to find the text span that matches the position
-              const textSpans = pageElement.querySelectorAll('.react-pdf__Page__textContent span');
-              Array.from(textSpans).forEach((span, spanIndex) => {
-                if (span.textContent && span.textContent.toLowerCase().includes(threat.text.toLowerCase())) {
-                  const threatColor = getThreatColor(threat.severity);
-                  
-                  // Create highlight wrapper using normal highlight styling
-                  const highlightWrapper = document.createElement('span');
-                  highlightWrapper.className = 'text-highlight pdf-threat-highlight';
-                  highlightWrapper.setAttribute('data-threat-id', threat.id || `threat-${pageNumber}-${index}`);
-                  highlightWrapper.style.backgroundColor = threatColor.backgroundColor;
-                  highlightWrapper.style.transition = "all 0.2s ease";
-                  highlightWrapper.style.position = "relative";
-                  highlightWrapper.style.zIndex = "1";
-                  highlightWrapper.style.cursor = "pointer";
-                  highlightWrapper.style.color = "black";
-                  highlightWrapper.style.fontWeight = "inherit";
-                  if (threatColor.borderColor) {
-                    highlightWrapper.style.borderBottom = `1px solid ${threatColor.borderColor}`;
-                  }
-                  highlightWrapper.title = `${threat.severity?.toUpperCase() || 'HIGH'}: ${threat.reason}`;
-                  
-                  // Replace only the matching part of the text
-                  const originalText = span.textContent;
-                  const threatTextIndex = originalText.toLowerCase().indexOf(threat.text.toLowerCase());
-                  
-                  if (threatTextIndex !== -1) {
-                    const beforeText = originalText.substring(0, threatTextIndex);
-                    const threatTextActual = originalText.substring(threatTextIndex, threatTextIndex + threat.text.length);
-                    const afterText = originalText.substring(threatTextIndex + threat.text.length);
-                    
-                    // Clear the span and rebuild it
-                    span.innerHTML = '';
-                    
-                    if (beforeText) {
-                      span.appendChild(document.createTextNode(beforeText));
-                    }
-                    
-                    highlightWrapper.textContent = threatTextActual;
-                    span.appendChild(highlightWrapper);
-                    
-                    if (afterText) {
-                      span.appendChild(document.createTextNode(afterText));
-                    }
-                    
-                    highlightApplied = true;
-                    console.log(`✅ FRONTEND: Applied threat highlight "${threat.text}" to span ${spanIndex}`);
-                  }
+              if (spanIndex < 5) {
+                console.log(`🎯 FRONTEND: Span ${spanIndex}: "${spanText.substring(0, 50)}..." contains threat: ${containsThreat}`);
+              }
+              
+              if (containsThreat) {
+                foundSpan = true;
+                console.log(`🎯 FRONTEND: FOUND THREAT in span ${spanIndex} on page ${threatPage.page}`);
+                
+                const threatColor = getThreatColor(threat.severity);
+                
+                // Create highlight wrapper using normal highlight styling
+                const highlightWrapper = document.createElement('span');
+                highlightWrapper.className = 'text-highlight pdf-threat-highlight';
+                highlightWrapper.setAttribute('data-threat-id', threat.id || `threat-${threatPage.page}-${index}`);
+                highlightWrapper.style.backgroundColor = threatColor.backgroundColor;
+                highlightWrapper.style.transition = "all 0.2s ease";
+                highlightWrapper.style.position = "relative";
+                highlightWrapper.style.zIndex = "1";
+                highlightWrapper.style.cursor = "pointer";
+                highlightWrapper.style.color = "black";
+                highlightWrapper.style.fontWeight = "inherit";
+                if (threatColor.borderColor) {
+                  highlightWrapper.style.borderBottom = `1px solid ${threatColor.borderColor}`;
                 }
-              });
-            }
-
-            // Approach 2: Fallback to simple text search if highlight data approach didn't work
-            if (!highlightApplied) {
-              console.log(`🎯 FRONTEND: Fallback to text search for "${threat.text}"`);
-              
-              const textSpans = pageElement.querySelectorAll('.react-pdf__Page__textContent span');
-              Array.from(textSpans).some((span, spanIndex) => {
-                if (span.textContent && span.textContent.toLowerCase().includes(threat.text.toLowerCase())) {
-                  const threatColor = getThreatColor(threat.severity);
+                highlightWrapper.title = `${threat.severity?.toUpperCase() || 'HIGH'}: ${threat.reason}`;
+                
+                // Replace only the matching part of the text
+                const originalText = span.textContent || '';
+                const threatTextIndex = originalText.toLowerCase().indexOf(threat.text.toLowerCase());
+                
+                if (threatTextIndex !== -1) {
+                  const beforeText = originalText.substring(0, threatTextIndex);
+                  const threatTextActual = originalText.substring(threatTextIndex, threatTextIndex + threat.text.length);
+                  const afterText = originalText.substring(threatTextIndex + threat.text.length);
                   
-                  // Create highlight wrapper using normal highlight styling
-                  const highlightWrapper = document.createElement('span');
-                  highlightWrapper.className = 'text-highlight pdf-threat-highlight';
-                  highlightWrapper.setAttribute('data-threat-id', threat.id || `threat-${pageNumber}-${index}`);
-                  highlightWrapper.style.backgroundColor = threatColor.backgroundColor;
-                  highlightWrapper.style.transition = "all 0.2s ease";
-                  highlightWrapper.style.position = "relative";
-                  highlightWrapper.style.zIndex = "1";
-                  highlightWrapper.style.cursor = "pointer";
-                  highlightWrapper.style.color = "black";
-                  highlightWrapper.style.fontWeight = "inherit";
-                  if (threatColor.borderColor) {
-                    highlightWrapper.style.borderBottom = `1px solid ${threatColor.borderColor}`;
+                  // Clear the span and rebuild it
+                  span.innerHTML = '';
+                  
+                  if (beforeText) {
+                    span.appendChild(document.createTextNode(beforeText));
                   }
-                  highlightWrapper.title = `${threat.severity?.toUpperCase() || 'HIGH'}: ${threat.reason}`;
                   
-                  // Wrap the entire span for simplicity in fallback mode
+                  highlightWrapper.textContent = threatTextActual;
+                  span.appendChild(highlightWrapper);
+                  
+                  if (afterText) {
+                    span.appendChild(document.createTextNode(afterText));
+                  }
+                  
+                  highlightApplied = true;
+                  console.log(`✅ FRONTEND: Applied threat highlight "${threat.text.substring(0, 50)}..." to page ${threatPage.page} span ${spanIndex}`);
+                }
+              }
+            });
+            
+            if (!foundSpan) {
+              console.warn(`⚠️ FRONTEND: No span found containing threat text "${threat.text.substring(0, 100)}..." on page ${threatPage.page}`);
+            }
+          }
+
+                // Approach 2: Fallback to simple text search if highlight data approach didn't work
+          if (!highlightApplied) {
+            console.log(`🎯 FRONTEND: Fallback to text search for "${threat.text}" on page ${threatPage.page}`);
+            
+            const textSpans = pageElement.querySelectorAll('.react-pdf__Page__textContent span');
+            Array.from(textSpans).some((span, spanIndex) => {
+              if (span.textContent && span.textContent.toLowerCase().includes(threat.text.toLowerCase())) {
+                const threatColor = getThreatColor(threat.severity);
+                
+                // Create highlight wrapper using normal highlight styling
+                const highlightWrapper = document.createElement('span');
+                highlightWrapper.className = 'text-highlight pdf-threat-highlight';
+                highlightWrapper.setAttribute('data-threat-id', threat.id || `threat-${threatPage.page}-${index}`);
+                highlightWrapper.style.backgroundColor = threatColor.backgroundColor;
+                highlightWrapper.style.transition = "all 0.2s ease";
+                highlightWrapper.style.position = "relative";
+                highlightWrapper.style.zIndex = "1";
+                highlightWrapper.style.cursor = "pointer";
+                highlightWrapper.style.color = "black";
+                highlightWrapper.style.fontWeight = "inherit";
+                if (threatColor.borderColor) {
+                  highlightWrapper.style.borderBottom = `1px solid ${threatColor.borderColor}`;
+                }
+                highlightWrapper.title = `${threat.severity?.toUpperCase() || 'HIGH'}: ${threat.reason}`;
+                
+                // Replace only the matching part of the text
+                const originalText = span.textContent || '';
+                const threatTextIndex = originalText.toLowerCase().indexOf(threat.text.toLowerCase());                if (threatTextIndex !== -1) {
+                  const beforeText = originalText.substring(0, threatTextIndex);
+                  const threatTextActual = originalText.substring(threatTextIndex, threatTextIndex + threat.text.length);
+                  const afterText = originalText.substring(threatTextIndex + threat.text.length);
+                  
+                  // Clear the span and rebuild it
+                  span.innerHTML = '';
+                  
+                  if (beforeText) {
+                    span.appendChild(document.createTextNode(beforeText));
+                  }
+                  
+                  highlightWrapper.textContent = threatTextActual;
+                  span.appendChild(highlightWrapper);
+                  
+                  if (afterText) {
+                    span.appendChild(document.createTextNode(afterText));
+                  }
+                  
+                  highlightApplied = true;
+                  console.log(`✅ FRONTEND: Applied fallback threat highlight "${threat.text}" to page ${threatPage.page} span ${spanIndex}`);
+                  return true; // Break out of the some() loop
+                } else {
+                  // If partial match fails, wrap the entire span for simplicity
                   highlightWrapper.textContent = span.textContent;
                   span.innerHTML = '';
                   span.appendChild(highlightWrapper);
                   
                   highlightApplied = true;
-                  console.log(`✅ FRONTEND: Applied fallback threat highlight "${threat.text}" to span ${spanIndex}`);
+                  console.log(`✅ FRONTEND: Applied fallback threat highlight (full span) "${threat.text}" to page ${threatPage.page} span ${spanIndex}`);
                   return true; // Break out of the some() loop
                 }
-                return false;
-              });
-            }
+              }
+              return false;
+            });
+          }
 
-            if (!highlightApplied) {
-              console.warn(`⚠️ FRONTEND: Could not apply highlight for threat "${threat.text}" - text not found in page`);
-            }
-          });
+          if (!highlightApplied) {
+            console.warn(`⚠️ FRONTEND: Could not apply highlight for threat "${threat.text}" on page ${threatPage.page} - text not found`);
+          }
+        });
 
-          const appliedCount = currentPageThreats.threats.length;
-          console.log(`✅ Applied threat highlighting for ${appliedCount} threats on page ${pageNumber}`);
-        }
-      } catch (error) {
-        console.error("Failed to apply threat highlights:", error);
-      }
-    }, 150),
-    [textLayerRef, threats, pageNumber, pagesRefs]
-  );
+        console.log(`✅ Applied threat highlighting for ${threatPage.threats.length} threats on page ${threatPage.page}`);
+      });
+    } catch (error) {
+      console.error("Failed to apply threat highlights:", error);
+    }
+  }, 150),
+  [textLayerRef, threats, pagesRefs] // 🔧 FIX: Remove pageNumber dependency
+);
 
   const updateHighlightById = (
     highlightId: string,
@@ -1233,11 +1362,22 @@ export const PDFProvider = ({
 
   useEffect(() => {
     applyHighlightsToTextLayer();
-  }, [applyHighlightsToTextLayer, highlights,]);
+  }, [applyHighlightsToTextLayer, highlights, storedThreats]);
 
+  // Add event listener for custom threats-ready event
   useEffect(() => {
-    applyThreatsToTextLayer();
-  }, [applyThreatsToTextLayer, threats, pageNumber]);
+    const handleThreatsReady = () => {
+      console.log('🎯 FRONTEND: Received threats-ready event, applying highlights...');
+      setTimeout(() => {
+        applyHighlightsToTextLayer();
+      }, 100);
+    };
+
+    document.addEventListener('threats-ready', handleThreatsReady);
+    return () => {
+      document.removeEventListener('threats-ready', handleThreatsReady);
+    };
+  }, [applyThreatsToTextLayer]);
 
   // Sync zoom input with zoom level changes
   useEffect(() => {
@@ -1382,13 +1522,17 @@ export const PDFProvider = ({
     removeExplanationById,
     clearAllExplanations,
     jumpToExplanation,
+    storedThreats,
+    setStoredThreats,
+    removeThreatById,
+    clearAllThreats,
+    addThreatToStorage,
     threats,
     setThreats,
     isAnalyzing,
     setIsAnalyzing,
     analyzePdfForThreats,
     jumpToThreat,
-    applyThreatsToTextLayer,
     highlightContextMenu,
     setHighlightContextMenu,
   };

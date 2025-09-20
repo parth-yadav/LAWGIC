@@ -321,14 +321,14 @@ export const THREAT_COLORS: HighlightColor[] = [
   {
     id: "threat-critical",
     name: "Critical Threat",
-    backgroundColor: "rgba(255, 0, 0, 1)",
-    borderColor: "rgba(255, 0, 0, 1)",
+    backgroundColor: "rgba(255, 0, 0 , 1)",
+    borderColor: "rgba(255, 0, 0  , 1)",
   },
   {
     id: "threat-high",
     name: "High Threat",
-    backgroundColor: "rgba(255, 0, 0, 1)",
-    borderColor: "rgba(255, 0, 0, 1)",
+    backgroundColor: "rgba(0,0,255, 1)",
+    borderColor: "rgba(0,0,255, 1)",
   },
   {
     id: "threat-medium",

@@ -40,8 +40,9 @@ export default function PdfThreats() {
     pdfUrl,
     numPages,
     textLayerRef,
-    highlights,
-    setHighlights,
+    storedThreats,
+    setStoredThreats,
+    addThreatToStorage,
     jumpToHighlight,
   } = usePDF();
 
@@ -56,13 +57,9 @@ export default function PdfThreats() {
   // ========================================
 
   /**
-   * Filter highlights to show only threats (those with threat-related tags)
+   * Filter stored threats to show all threats
    */
-  const threatHighlights = highlights.filter(highlight => 
-    highlight.metadata.tags?.some(tag => 
-      ['threat', 'security', 'critical', 'high', 'medium', 'low'].includes(tag.toLowerCase())
-    )
-  );
+  const threatHighlights = storedThreats;
 
   /**
    * Filter threat highlights based on search query and severity
@@ -340,9 +337,11 @@ export default function PdfThreats() {
         
         const range = currentSelection.getRangeAt(0);
         
-        // Calculate offsets for the highlight position using the actual range boundaries
-        const startOffset = getTextOffsetInPage(pageElement, range.startContainer, range.startOffset);
-        const endOffset = getTextOffsetInPage(pageElement, range.endContainer, range.endOffset);
+        // Calculate DOCUMENT-ABSOLUTE offsets using the entire text layer
+        const startOffset = getTextOffsetInDocument(range.startContainer, range.startOffset);
+        const endOffset = getTextOffsetInDocument(range.endContainer, range.endOffset);
+        
+        console.log(`🔍 THREATS: Document offsets - start: ${startOffset}, end: ${endOffset}`);
         
         const id = `threat-${Date.now()}-${threatNumber}`;
         const timestamp = new Date().toISOString();
@@ -358,7 +357,7 @@ export default function PdfThreats() {
             startOffset,
             endOffset,
             pageNumber,
-            startPageOffset: startOffset,
+            startPageOffset: startOffset, // Use document offset for consistency
             endPageOffset: endOffset,
           },
           color,
@@ -389,11 +388,13 @@ export default function PdfThreats() {
   };
 
   /**
-   * Calculate text offset within a page element
+   * Calculate text offset within the entire document (document-absolute)
    */
-  const getTextOffsetInPage = (pageElement: Element, targetNode: Node, targetOffset: number): number => {
+  const getTextOffsetInDocument = (targetNode: Node, targetOffset: number): number => {
+    if (!textLayerRef.current) return 0;
+    
     const walker = document.createTreeWalker(
-      pageElement,
+      textLayerRef.current, // Walk through entire text layer, not just the page
       NodeFilter.SHOW_TEXT,
       null
     );
@@ -409,6 +410,29 @@ export default function PdfThreats() {
     }
     
     return totalOffset;
+  };
+
+  /**
+   * Convert page-relative offset to document-absolute offset
+   */
+  const convertToDocumentOffset = (pageNumber: number, pageRelativeOffset: number): number => {
+    if (!textLayerRef.current) return pageRelativeOffset;
+    
+    let documentOffset = 0;
+    
+    // Add text from all previous pages
+    for (let pageNum = 1; pageNum < pageNumber; pageNum++) {
+      const pageElement = textLayerRef.current.querySelector(`[data-page-number="${pageNum}"]`);
+      if (pageElement) {
+        const pageText = pageElement.textContent || '';
+        documentOffset += pageText.length;
+      }
+    }
+    
+    // Add the page-relative offset
+    documentOffset += pageRelativeOffset;
+    
+    return documentOffset;
   };
 
   /**
@@ -509,19 +533,16 @@ export default function PdfThreats() {
         }
       }
 
-      // Step 4: Add threat highlights to existing highlights
+      // Step 4: Add threat highlights to stored threats
       console.log(`🔍 THREATS: Step 4 - Adding ${newThreatHighlights.length} threat highlights`);
       
-      // Remove existing threat highlights first
-      const nonThreatHighlights = highlights.filter(h => 
-        !h.metadata.tags?.some(tag => 
-          ['threat', 'security'].includes(tag.toLowerCase())
-        )
-      );
+      // Clear existing threats first
+      setStoredThreats([]);
       
-      // Combine with new threat highlights
-      const updatedHighlights = [...nonThreatHighlights, ...newThreatHighlights];
-      setHighlights(updatedHighlights);
+      // Add new threat highlights to stored threats
+      newThreatHighlights.forEach(threat => {
+        addThreatToStorage(threat);
+      });
       
       console.log(`✅ THREATS: Analysis complete - Found ${newThreatHighlights.length} threats`);
       

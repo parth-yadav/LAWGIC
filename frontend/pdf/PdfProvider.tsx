@@ -942,10 +942,10 @@ export const PDFProvider = ({
     (explanation: StoredExplanation) => {
       console.log('jumpToExplanation called with:', explanation);
       
-      // First, scroll to the correct page
+      // Scroll to the correct page and show the full page
       scrollToPage(explanation.pageNumber, false);
       
-      // Wait for page to render and scroll to complete
+      // Wait for page to render and scroll to complete, then apply visual effects
       setTimeout(() => {
         const pageElement = pagesRefs.current?.get(explanation.pageNumber);
         if (!pageElement) {
@@ -976,14 +976,7 @@ export const PDFProvider = ({
         if (matchingSpans.length > 0) {
           console.log(`Found ${matchingSpans.length} spans containing explanation text`);
           
-          // Scroll to the first matching span
-          matchingSpans[0].scrollIntoView({
-            behavior: "smooth",
-            block: "center",
-            inline: "center",
-          });
-
-          // Apply temporary border effect to all matching spans
+          // Apply temporary border effect to all matching spans (no scrolling to specific text)
           matchingSpans.forEach((span) => {
             // Store original styles
             const originalBorder = span.style.border;

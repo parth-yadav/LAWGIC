@@ -960,78 +960,63 @@ export const PDFProvider = ({
           return;
         }
 
-        // Create a temporary highlight using the highlight system
-        const tempHighlight: Highlight = {
-          id: `temp-explanation-${explanation.id}`,
-          text: explanation.selectedText,
-          position: {
-            startOffset: explanation.position.startOffset,
-            endOffset: explanation.position.endOffset,
-            pageNumber: explanation.position.pageNumber,
-            startPageOffset: explanation.position.startOffset,
-            endPageOffset: explanation.position.endOffset,
-            startXPath: '', // Not needed for temporary highlight
-            endXPath: '',   // Not needed for temporary highlight
-          },
-          color: {
-            id: "red",
-            name: "Red",
-            backgroundColor: "rgba(255,0,0, 0.5)",
-            borderColor: "rgba(255,0,0, 0.8)",
-          }, // Red color for explanation highlight
-          metadata: {
-            id: `temp-explanation-${explanation.id}`,
-            text: explanation.selectedText,
-            createdAt: new Date().toISOString(),
-          },
-          isTemporary: true,
-        };
-
-        console.log('Creating temporary highlight for explanation');
+        // Find text spans containing the explanation text
+        const textSpans = Array.from(textLayer.querySelectorAll('span'));
+        const explanationText = explanation.selectedText.toLowerCase();
         
-        // Apply the temporary highlight using the existing highlight system
-        applyHighlights(textLayer as Element, [tempHighlight]);
-        
-        // Wait a moment for the highlight to be applied, then find and animate it
-        setTimeout(() => {
-          const highlightElements = Array.from(
-            textLayer.querySelectorAll(`[data-highlight-id="${tempHighlight.id}"]`)
-          ) as HTMLElement[];
-
-          if (highlightElements.length > 0) {
-            console.log('Found temporary highlight elements:', highlightElements.length);
-            
-            // Scroll to the highlight
-            highlightElements[0].scrollIntoView({
-              behavior: "smooth",
-              block: "center",
-              inline: "center",
-            });
-
-            // Flash the highlight with animation
-            highlightElements.forEach((element) => {
-              element.style.boxShadow = "0 0 0 4px #ff0000, 0 0 16px rgba(255, 0, 0, 0.8)";
-              element.style.transition = "box-shadow 0.3s ease";
-              
-              element.animate(
-                [
-                  { transform: "scale(1)" },
-                  { transform: "scale(1.05)" },
-                  { transform: "scale(1)" },
-                ],
-                { duration: 600, easing: "ease-in-out" }
-              );
-            });
-
-            // Remove the temporary highlight after 3 seconds
-            setTimeout(() => {
-              removeHighlight(textLayer as Element, tempHighlight.id);
-              console.log('Removed temporary explanation highlight');
-            }, 3000);
-          } else {
-            console.warn('No temporary highlight elements found');
+        // Find spans that contain the explanation text
+        const matchingSpans: HTMLElement[] = [];
+        textSpans.forEach(span => {
+          const spanText = (span.textContent || '').toLowerCase();
+          if (spanText.includes(explanationText)) {
+            matchingSpans.push(span as HTMLElement);
           }
-        }, 200);
+        });
+
+        if (matchingSpans.length > 0) {
+          console.log(`Found ${matchingSpans.length} spans containing explanation text`);
+          
+          // Scroll to the first matching span
+          matchingSpans[0].scrollIntoView({
+            behavior: "smooth",
+            block: "center",
+            inline: "center",
+          });
+
+          // Apply temporary border effect to all matching spans
+          matchingSpans.forEach((span) => {
+            // Store original styles
+            const originalBorder = span.style.border;
+            const originalBoxShadow = span.style.boxShadow;
+            const originalTransition = span.style.transition;
+            
+            // Apply temporary border effect
+            span.style.border = "2px solid #ff0000";
+            span.style.boxShadow = "0 0 8px rgba(255, 0, 0, 0.6)";
+            span.style.transition = "all 0.3s ease";
+            
+            // Animate the span
+            span.animate(
+              [
+                { transform: "scale(1)" },
+                { transform: "scale(1.02)" },
+                { transform: "scale(1)" },
+              ],
+              { duration: 600, easing: "ease-in-out" }
+            );
+
+            // Remove the border effect after 2 seconds
+            setTimeout(() => {
+              span.style.border = originalBorder;
+              span.style.boxShadow = originalBoxShadow;
+              span.style.transition = originalTransition;
+            }, 2000);
+          });
+          
+          console.log('Applied temporary border effect to explanation text');
+        } else {
+          console.warn('No spans found containing explanation text:', explanation.selectedText);
+        }
       }, 800);
     },
     [pagesRefs, scrollToPage]

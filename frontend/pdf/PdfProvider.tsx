@@ -976,8 +976,8 @@ export const PDFProvider = ({
           color: {
             id: "red",
             name: "Red",
-            backgroundColor: "rgba(0,255,0, 0.5)",
-            borderColor: "rgba(0,200,0, 0.8)",
+            backgroundColor: "rgba(255,0,0, 0.5)",
+            borderColor: "rgba(255,0,0, 0.8)",
           }, // Red color for explanation highlight
           metadata: {
             id: `temp-explanation-${explanation.id}`,

@@ -1,7 +1,7 @@
 import axios from "axios";
 
 const API_BASE_URL =
-  process.env.NEXT_PUBLIC_SERVER_BASE_URL || "http://localhost:3000";
+  process.env.SERVER_BASE_URL || "http://localhost:6900";
 
 const authEndpoints = [
   "/auth/login",

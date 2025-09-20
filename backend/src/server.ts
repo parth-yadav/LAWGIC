@@ -6,6 +6,7 @@ import authRouter from "./routes/auth.routes";
 import validateEnv from "./utils/validateEnv";
 import explainRouter from "./routes/explain.routes";
 import documentRouter from "./routes/document.routes";
+import threatRouter from "./routes/threat.routes";
 
 dotenv.config();
 
@@ -23,17 +24,18 @@ app.use(
   })
 );
 
-app.use(express.json());
+app.use(express.json({ limit: "50mb" }));
 app.use(cookieParser());
-app.use(express.urlencoded({ extended: false }));
+app.use(express.urlencoded({ limit: "50mb", extended: true }));
 
 app.get("/", (_req, res) => {
   res.send(`This is your API`);
 });
 
 app.use("/auth", authRouter);
-app.use("/explain", explainRouter);
 app.use("/documents", documentRouter);
+app.use("/explain", explainRouter);
+app.use("/threats", threatRouter);
 
 validateEnv()
   .then(() => {

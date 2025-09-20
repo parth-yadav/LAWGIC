@@ -4,9 +4,11 @@ import {
   getUserDocuments,
   deleteDocument,
   getDocumentById,
+  renameDocumentById,
+  getDocumentThumbnail,
 } from "../controllers/document.controllers.js";
 import validToken from "../middlewares/validToken.js";
-import { uploadSingle } from "../middlewares/upload.js";
+import { uploadDocumentWithThumbnail } from "../middlewares/upload.js";
 
 const router = Router();
 
@@ -15,7 +17,7 @@ router.use(validToken);
 router.post(
   "/",
   (req, res, next) => {
-    uploadSingle(req, res, (err) => {
+    uploadDocumentWithThumbnail(req, res, (err: any) => {
       if (err) {
         res.status(400).json({
           success: false,
@@ -31,6 +33,8 @@ router.post(
 
 router.get("/", getUserDocuments);
 router.get("/:id", getDocumentById);
+router.get("/:id/thumbnail", getDocumentThumbnail);
+router.post("/:id/rename", renameDocumentById);
 router.delete("/:id", deleteDocument);
 
 export default router;

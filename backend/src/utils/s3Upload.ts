@@ -78,4 +78,36 @@ export const generateSignedUrl = async (
   }
 };
 
+export const getFileFromS3 = async (
+  fileKey: string
+): Promise<{
+  stream: NodeJS.ReadableStream;
+  contentType?: string;
+  contentLength?: number;
+}> => {
+  try {
+    const bucket = process.env.S3_BUCKET!;
+
+    const command = new GetObjectCommand({
+      Bucket: bucket,
+      Key: fileKey,
+    });
+
+    const response = await s3Client.send(command);
+
+    if (!response.Body) {
+      throw new Error("No file body returned from S3");
+    }
+
+    return {
+      stream: response.Body as NodeJS.ReadableStream,
+      ...(response.ContentType && { contentType: response.ContentType }),
+      ...(response.ContentLength && { contentLength: response.ContentLength }),
+    };
+  } catch (error) {
+    console.error("Get file from S3 error:", error);
+    throw new Error("Failed to get file from S3");
+  }
+};
+
 export { s3Client };

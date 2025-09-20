@@ -69,13 +69,14 @@ model Document {
   fileName  String
   filePath  String
   fileKey   String
+  thumbnail String?
   pageCount Int
   deletedAt DateTime?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   threats Threat[]
-  complexTerms   ComplexTerm[]
+  explanations Explanation[]
   highlights Highlight[]
 
   @@map("documents")
@@ -98,10 +99,10 @@ model Highlight {
   @@map("highlights")
 }
 
-model ComplexTerm {
+model Explanation {
   id               String   @id @default(cuid())
   documentId       String
-  document Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  document         Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
   selectedText     String   @db.Text
   explanationMeaning String @db.Text
   pageNumber       Int

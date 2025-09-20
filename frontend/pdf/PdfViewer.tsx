@@ -33,10 +33,7 @@ import {
 import { createHighlightFromSelection } from "./highlight/utils";
 import { Separator } from "@/components/ui/separator";
 import ApiClient from "@/utils/ApiClient";
-import { start } from "repl";
 import { extractContextText } from "./explain/extractContext";
-import { set } from "zod";
-import { se } from "date-fns/locale";
 import { toast } from "sonner";
 
 // ========================================
@@ -82,7 +79,7 @@ export default function PdfViewer({ className = "" }: { className?: string }) {
   const [currentHighlightColor, setCurrentHighlightColor] =
     useLocalState<HighlightColor>(
       "current-highlight-color",
-      DEFAULT_HIGHLIGHT_COLOR
+      DEFAULT_HIGHLIGHT_COLOR,
     );
   const [explanation, setExplanation] = useState<ExplanationData | null>(null);
 
@@ -205,7 +202,7 @@ export default function PdfViewer({ className = "" }: { className?: string }) {
       }
       selectionCheckInterval.current = setInterval(checkSelection, 100);
     },
-    [pageNumber, textLayerRef, checkSelection]
+    [pageNumber, textLayerRef, checkSelection],
   );
 
   // ========================================
@@ -330,7 +327,7 @@ export default function PdfViewer({ className = "" }: { className?: string }) {
         const highlight = createHighlightFromSelection(
           textLayerRef.current,
           pageNumber,
-          { color }
+          { color },
         );
         if (highlight) {
           setHighlights((prev) => [...prev, highlight]);
@@ -338,7 +335,7 @@ export default function PdfViewer({ className = "" }: { className?: string }) {
         clearSelection();
       }
     },
-    [selection, textLayerRef, pageNumber, currentHighlightColor]
+    [selection, textLayerRef, pageNumber, currentHighlightColor],
   );
 
   // Set up event listeners
@@ -377,20 +374,20 @@ export default function PdfViewer({ className = "" }: { className?: string }) {
   return (
     <div
       ref={textLayerRef}
-      className={`pdf-container relative w-full h-screen bg-background flex flex-col flex-1 justify-start p-4 overflow-scroll ${className}`}
+      className={`pdf-container bg-background relative flex h-screen w-full flex-1 flex-col justify-start overflow-scroll p-4 ${className}`}
     >
       <Document
         file={pdfUrl}
         onLoadSuccess={onLoadSuccess}
         className={cn(
           "flex flex-col",
-          toolbarPosition === "top" ? "pt-10" : "pb-10"
+          toolbarPosition === "top" ? "pt-10" : "pb-10",
         )}
         rotate={rotation}
         scale={zoomLevel}
         loading={
           <div>
-            <LoaderCircleIcon className="animate-spin h-full mx-auto size-10" />
+            <LoaderCircleIcon className="mx-auto size-10 h-full animate-spin" />
           </div>
         }
       >
@@ -408,7 +405,7 @@ export default function PdfViewer({ className = "" }: { className?: string }) {
                 renderAnnotationLayer={false}
                 renderTextLayer={true}
                 onRenderTextLayerSuccess={applyHighlightsToTextLayer}
-                className="border border-border shadow-lg bg-white"
+                className="border-border border bg-white shadow-lg"
               />
             </div>
           ))}
@@ -427,13 +424,13 @@ export default function PdfViewer({ className = "" }: { className?: string }) {
               e.preventDefault();
             }}
             className={cn(
-              "fixed bg-card p-2 px-3 rounded-md shadow-lg border-border border z-100000",
-              "flex flex-col gap-2"
+              "bg-card border-border fixed z-100000 rounded-md border p-2 px-3 shadow-lg",
+              "flex flex-col gap-2",
             )}
             style={{
               left: Math.min(
                 Math.max(selection.x - 60, 10), // Center the menu and prevent left overflow
-                window.innerWidth - 130 // Prevent right overflow (menu width ~120px + margin)
+                window.innerWidth - 130, // Prevent right overflow (menu width ~120px + margin)
               ),
               top: selection.shouldShowBelow
                 ? Math.min(selection.y + 10, window.innerHeight - 80) // Below selection with margin
@@ -470,7 +467,7 @@ export default function PdfViewer({ className = "" }: { className?: string }) {
                 Explain
               </Button>
 
-              <div className="flex flex-row items-center gap-2 pl-2 h-full border-l border-border">
+              <div className="border-border flex h-full flex-row items-center gap-2 border-l pl-2">
                 <span>Highlight</span>
                 <div className="flex flex-row items-center">
                   <Button
@@ -478,7 +475,7 @@ export default function PdfViewer({ className = "" }: { className?: string }) {
                     variant={"outline"}
                     size="sm"
                     onClick={() => highlightSelectedText()}
-                    className="flex items-center gap-2 text-sm rounded-r-none text-black"
+                    className="flex items-center gap-2 rounded-r-none text-sm text-black"
                     style={{
                       backgroundColor: currentHighlightColor.backgroundColor,
                       borderColor: currentHighlightColor.borderColor,
@@ -492,12 +489,12 @@ export default function PdfViewer({ className = "" }: { className?: string }) {
                       <Button
                         size={"sm"}
                         variant={"outline"}
-                        className={"px-0 rounded-l-none"}
+                        className={"rounded-l-none px-0"}
                       >
                         <ChevronDownIcon />
                       </Button>
                     </PopoverTrigger>
-                    <PopoverContent className="translate-y-2 flex flex-row gap-1 w-max">
+                    <PopoverContent className="flex w-max translate-y-2 flex-row gap-1">
                       {DEFAULT_HIGHLIGHT_COLORS.map((color, index) => (
                         <Button
                           key={index}
@@ -526,7 +523,7 @@ export default function PdfViewer({ className = "" }: { className?: string }) {
                   animate={{ opacity: 1, height: "auto" }}
                   exit={{ opacity: 0, height: 0 }}
                   transition={{ duration: 0.2 }}
-                  className="mt-2 p-2 bg-muted text-sm rounded-md overflow-y-auto text-muted-foreground"
+                  className="bg-muted text-muted-foreground mt-2 overflow-y-auto rounded-md p-2 text-sm"
                 >
                   {explanation.meaning}
                 </motion.div>
@@ -556,9 +553,9 @@ export default function PdfViewer({ className = "" }: { className?: string }) {
             }}
             onMouseLeave={() => setHighlightContextMenu(null)}
             className={cn(
-              "bg-card border border-border rounded-2xl shadow-md p-2",
+              "bg-card border-border rounded-2xl border p-2 shadow-md",
               "absolute top-0 left-0 z-[100000]",
-              "flex flex-col items-stretch w-40 gap-2"
+              "flex w-40 flex-col items-stretch gap-2",
             )}
             onClick={(e) => {
               setHighlightContextMenu(null);

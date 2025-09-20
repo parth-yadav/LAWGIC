@@ -17,6 +17,28 @@ const fileFilter = (
   }
 };
 
+// File filter for documents and thumbnails
+const documentWithThumbnailFilter = (
+  _req: Request,
+  file: Express.Multer.File,
+  cb: multer.FileFilterCallback
+) => {
+  if (file.fieldname === "file" && file.mimetype === "application/pdf") {
+    cb(null, true);
+  } else if (
+    file.fieldname === "thumbnail" &&
+    file.mimetype.startsWith("image/")
+  ) {
+    cb(null, true);
+  } else {
+    cb(
+      new Error(
+        "Only PDF files for document and image files for thumbnail are allowed"
+      )
+    );
+  }
+};
+
 // Configure multer
 export const upload = multer({
   storage,
@@ -26,5 +48,21 @@ export const upload = multer({
   },
 });
 
+// Configure multer for document with thumbnail upload
+export const uploadWithThumbnail = multer({
+  storage,
+  fileFilter: documentWithThumbnailFilter,
+  limits: {
+    fileSize: 50 * 1024 * 1024, // 50MB limit
+    files: 2, // Max 2 files (document + thumbnail)
+  },
+});
+
 // Middleware for single file upload
 export const uploadSingle = upload.single("file");
+
+// Middleware for document with optional thumbnail upload
+export const uploadDocumentWithThumbnail = uploadWithThumbnail.fields([
+  { name: "file", maxCount: 1 },
+  { name: "thumbnail", maxCount: 1 },
+]);

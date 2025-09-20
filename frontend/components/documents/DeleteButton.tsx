@@ -13,13 +13,12 @@ import {
 } from "@/components/ui/dialog";
 import { useState, useTransition } from "react";
 import ApiClient from "@/utils/ApiClient";
-import { start } from "repl";
 
 export default function DeleteButton({
-  id,
+  document,
   onDelete,
 }: {
-  id: string;
+  document: UserDocument;
   onDelete?: () => void;
 }) {
   const [open, setOpen] = useState<boolean>(false);
@@ -28,7 +27,7 @@ export default function DeleteButton({
   const handleDelete = async () => {
     startDeleting(async () => {
       try {
-        const response = await ApiClient.delete(`/documents/${id}`);
+        const response = await ApiClient.delete(`/documents/${document.id}`);
         const { success } = response.data;
         if (success) {
           onDelete?.();

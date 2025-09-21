@@ -13,7 +13,7 @@ import {
 import { useState, useEffect, useRef } from "react";
 import { motion, useInView, useAnimation } from "framer-motion";
 import { useRouter } from "next/navigation";
-import useIsMobile from "@/hooks/useIsMobile";
+// import useIsMobile from "@/hooks/useIsMobile";
 
 const features = [
   {
@@ -63,10 +63,10 @@ export default function Features() {
   const ringControls = useAnimation();
 
   useEffect(() => {
-    if (isMobile) {
-      // On mobile, no ring animation needed - static layout
-      return;
-    }
+    // if (isMobile) {
+    //   // On mobile, no ring animation needed - static layout
+    //   return;
+    // }
 
     if (isInView) {
       // Stop ring rotation and move to positions
@@ -88,7 +88,7 @@ export default function Features() {
       });
       controls.start("ring");
     }
-  }, [isInView, controls, ringControls, isMobile]);
+  }, [isInView, controls, ringControls]);
 
   const handleFeatureClick = () => {
     router.push("/dashboard");

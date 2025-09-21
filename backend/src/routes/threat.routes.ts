@@ -2,8 +2,8 @@ import express from "express";
 import {
   analyzePdfContent,
   healthCheck,
-} from "@/controllers/threat.controllers";
-import validToken from "@/middlewares/validToken";
+} from "../controllers/threat.controllers.js";
+import validToken from "../middlewares/validToken.js";
 
 const threatRouter = express.Router();
 

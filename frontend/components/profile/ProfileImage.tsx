@@ -161,7 +161,7 @@ export default function ProfileImage({ user }: { user: User }) {
         ) : imageUrl ? (
           <>
             <div className="relative flex size-54 flex-col items-center justify-center overflow-hidden rounded-2xl">
-              <img
+              <Image
                 src={imageUrl}
                 alt="profile-image"
                 width={500}

@@ -1,6 +1,6 @@
-import prisma from "@/prisma/client";
-import { accessSecret } from "@/utils/auth";
-import { getErrorMessage } from "@/utils/utils";
+import prisma from "../prisma/client.js";
+import { accessSecret } from "../utils/auth.js";
+import { getErrorMessage } from "../utils/utils.js";
 import { Request, Response, NextFunction } from "express";
 import jwt from "jsonwebtoken";
 

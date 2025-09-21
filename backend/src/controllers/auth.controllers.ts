@@ -1,4 +1,4 @@
-import prisma from "@/prisma/client";
+import prisma from "../prisma/client.js";
 import {
   accessSecret,
   accessTokenCookieOptions,
@@ -9,16 +9,16 @@ import {
   refreshTokenCookieOptions,
   refreshTokenExpiry,
   testUser,
-} from "@/utils/auth";
+} from "../utils/auth.js";
 import jwt from "jsonwebtoken";
 import ms, { StringValue } from "ms";
-import { getErrorMessage } from "@/utils/utils";
+import { getErrorMessage } from "../utils/utils.js";
 import { Request, Response } from "express";
-import { sendResponse } from "@/utils/ResponseHelpers";
-import { oAuth2Client } from "@/utils/googleClient";
+import { sendResponse } from "../utils/ResponseHelpers.js";
+import { oAuth2Client } from "../utils/googleClient.js";
 import { User } from "@prisma/client";
 import crypto from "crypto";
-import sendMail from "@/utils/sendMail";
+import sendMail from "../utils/sendMail.js";
 import axios from "axios";
 
 export const generateTokens = async (

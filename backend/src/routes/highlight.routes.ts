@@ -4,8 +4,8 @@ import {
   getHighlightsByDocument,
   updateHighlight,
   deleteHighlight,
-} from "@/controllers/highlight.controllers";
-import validToken from "@/middlewares/validToken";
+} from "../controllers/highlight.controllers.js";
+import validToken from "../middlewares/validToken.js";
 
 const highlightRouter = express.Router();
 

@@ -1,7 +1,7 @@
 import { Request, Response } from "express";
-import { sendResponse } from "@/utils/ResponseHelpers";
-import { getErrorMessage } from "@/utils/utils";
-import prisma from "@/prisma/client";
+import { sendResponse } from "../utils/ResponseHelpers.js";
+import { getErrorMessage } from "../utils/utils.js";
+import prisma from "../prisma/client.js";
 
 // Color definitions to match frontend
 const DEFAULT_HIGHLIGHT_COLORS = [

@@ -1,9 +1,9 @@
 import "dotenv/config";
 import { Request, Response } from "express";
 import { GoogleGenerativeAI } from "@google/generative-ai";
-import { sendResponse } from "@/utils/ResponseHelpers";
-import { getErrorMessage } from "@/utils/utils";
-import prisma from "@/prisma/client";
+import { sendResponse } from "../utils/ResponseHelpers.js";
+import { getErrorMessage } from "../utils/utils.js";
+import prisma from "../prisma/client.js";
 
 const key = process.env.COMPLEX_WORDS_API_KEY;
 

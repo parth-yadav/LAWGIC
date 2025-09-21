@@ -347,11 +347,11 @@ export default function Features() {
                       <p className="text-xs text-muted-foreground leading-relaxed">
                         {feature.description}
                       </p>
-
+{/* 
                       <div className="flex items-center text-primary font-semibold text-xs opacity-75 hover:opacity-100 transition-opacity duration-300">
                         Explore feature
                         <ArrowRightIcon className="ml-1 h-3 w-3" />
-                      </div>
+                      </div> */}
                     </div>
                   </motion.div>
                 </div>

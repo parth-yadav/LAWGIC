@@ -37,8 +37,8 @@ export default function Logo() {
       <Image
         src={logoSrc}
         alt={appName}
-        width={120}
-        height={40}
+        width={420}
+        height={160}
         className="h-8 w-auto"
         priority
       />

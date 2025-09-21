@@ -9,6 +9,7 @@ import Link from "next/link";
 export default function Hero() {
   return (
     <section className="py-20 md:py-32 bg-background w-full">
+     
       <div className="container px-4 mx-auto">
         <div className="text-center max-w-4xl mx-auto">
           <Reveal type="bottomUp" duration={0.8} once={true}>

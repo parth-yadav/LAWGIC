@@ -39,7 +39,7 @@ export default function Logo() {
         alt={appName}
         width={420}
         height={160}
-        className="h-8 w-auto"
+        className="h-8 w-48"
         priority
       />
     </Link>

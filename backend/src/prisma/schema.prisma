@@ -7,6 +7,10 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+// #########################
+// User Management
+// ##########################
+
 model User {
   id          String    @id @default(cuid())
   email       String    @unique
@@ -20,9 +24,8 @@ model User {
 
   refreshTokens RefreshToken[]
   otp           otp?
-  documents     Document[]
-  highlights    Highlight[]
-  threats       Threat[]
+
+  documents Document[]
 
   @@map("users")
 }
@@ -54,105 +57,82 @@ model otp {
   @@map("otps")
 }
 
+// #########################
+// Document Management
+// ##########################
+
 model Document {
-  id          String      @id @default(cuid())
-  userId      String
-  user        User        @relation(fields: [userId], references: [id])
-  title       String
-  filename    String
-  fileUrl     String
-  mimeType    String
-  fileSize    Int
-  pageCount   Int?
-  createdAt   DateTime    @default(now())
-  updatedAt   DateTime    @updatedAt
-  
-  highlights  Highlight[]
-  threats     Threat[]
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  title     String
+  fileName  String
+  filePath  String
+  fileKey   String
+  thumbnail String?
+  pageCount Int
+  deletedAt DateTime?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  threats Threat[]
+  explanations Explanation[]
+  highlights Highlight[]
 
   @@map("documents")
 }
 
 model Highlight {
+  id          String   @id @default(cuid())
+  documentId  String
+  document    Document @relation(fields: [documentId], references: [id])
+  pageNumber  Int
+  position    Json
+  text        String   
+  color       String   
+  note        String? 
+  explanation String?
+  tags        String[] 
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("highlights")
+}
+
+model Explanation {
   id               String   @id @default(cuid())
   documentId       String
   document         Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
-  userId           String
-  user             User     @relation(fields: [userId], references: [id])
-  
-  // Basic highlight data
-  text             String   
+  selectedText     String   @db.Text
+  explanationMeaning String @db.Text
   pageNumber       Int
-  
-  // Position data - stored as JSON for flexibility
-  position         Json     // Contains: startOffset, endOffset, startXPath?, endXPath?, startPageOffset?, endPageOffset?
-  
-  // Visual appearance
-  color            Json     // Contains: id, name, backgroundColor, borderColor?, textColor?
-  
-  // Metadata
-  note             String?  
-  tags             String[] 
-  author           String?  @default("user")
-  
-  // State flags
-  isActive         Boolean  @default(false)
-  isTemporary      Boolean  @default(false)
-  
-  // Threat-specific fields (nullable for regular highlights)
-  threatId         String?  @unique
-  threat           Threat?  @relation(fields: [threatId], references: [id])
-  
+  startOffset      Int
+  endOffset        Int
+  position         Json
   createdAt        DateTime @default(now())
-  updatedAt        DateTime @updatedAt
 
-  @@index([documentId, pageNumber])
-  @@index([userId, documentId])
-  @@map("highlights")
+  @@map("complex_terms")
 }
 
 model Threat {
   id               String      @id @default(cuid())
   documentId       String
   document         Document    @relation(fields: [documentId], references: [id], onDelete: Cascade)
-  userId           String
-  user             User         @relation(fields: [userId], references: [id])
-  
-  // Core threat data
-  text             String      // The threatening text content
-  explanation      String      // Why this is considered a threat (reason)
+  text             String
+  explanation      String
   pageNumber       Int
-  threatNumber     Int         // Sequential number within analysis
-  
-  // Classification
+  threatNumber     Int
   severity         ThreatSeverity @default(HIGH)
-  category         String?     // Type of threat (SQL injection, XSS, etc.)
-  confidence       Float       @default(1.0) // Confidence level 0-1
-  
-  // Position and bounding data
-  position         Json?       // Position information for precise highlighting
-  boundingBox      Json?       // Bounding box data: {x, y, width, height}
-  wordIndices      Int[]       // Array of word indices for precise positioning
-  
-  // Analysis metadata
-  analysisVersion  String?     // Version of analysis engine used
-  detectedAt       DateTime    @default(now())
-  
-  // Relationships
-  highlight        Highlight?  // Optional linked highlight
-  
+  category         String?     
+  confidence       Float       @default(1.0)
+  position         Json        
   createdAt        DateTime    @default(now())
   updatedAt        DateTime    @updatedAt
-
-  @@index([documentId, pageNumber])
-  @@index([userId, documentId])
-  @@index([severity])
-  @@map("threats")
 }
 
 enum ThreatSeverity {
   LOW
   MEDIUM
   HIGH
-  CRITICAL
+  CRITICAL
 }

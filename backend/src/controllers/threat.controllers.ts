@@ -1,11 +1,14 @@
-import 'dotenv/config';
-import { Request, Response } from 'express';
+import "dotenv/config";
+import { Request, Response } from "express";
 import { GoogleGenerativeAI } from "@google/generative-ai";
+import { sendResponse } from "@/utils/ResponseHelpers";
+import { getErrorMessage } from "@/utils/utils";
+import prisma from "@/prisma/client";
 
 const key = process.env.COMPLEX_WORDS_API_KEY;
 
 if (!key) {
-    throw new Error("key not set in .env");
+  throw new Error("key not set in .env");
 }
 
 const genAI = new GoogleGenerativeAI(key);
@@ -13,64 +16,21 @@ const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
 
 /**
  * Analyzes text content for security threats using Gemini AI
- * For DEVELOPMENT: Creates mock threats from specific test strings
- * 
+ *
  * @param {string} textContent - The text content to analyze
  * @param {number} pageNumber - The page number being analyzed
  * @returns {Array} Array of threats found
  */
 
-
-//DUMMY_HELPER
-async function analyzePageForThreats(textContent: string, pageNumber: number) {
-    try {
-        console.log(`🤖 BACKEND: Analyzing page ${pageNumber} with DEVELOPMENT MODE`);
-        console.log(`🤖 BACKEND: Text length: ${textContent.length} characters`);
-
-        // DEVELOPMENT MODE: Send specific test string as threat
-        const testThreatString = "Our maximum liability under this Benefit";
-
-        // Check if the test string exists in the content
-        if (textContent.toLowerCase().includes(testThreatString.toLowerCase())) {
-            console.log(`🤖 BACKEND: Found test threat string in page ${pageNumber}`);
-
-            const mockThreats = [{
-                number: 1,
-                page: pageNumber,
-                exactStringThreat: testThreatString,
-                explanation: `Development test threat: "${testThreatString}" detected for testing frontend highlighting system. This specific string is used to verify the Selection API integration and highlight creation process.`
-            }];
-
-            console.log(`🤖 BACKEND: Created 1 mock threat for page ${pageNumber}:`);
-            console.log(`🤖 BACKEND: Mock Threat: "${testThreatString}"`);
-
-            return mockThreats;
-        } else {
-            console.log(`🤖 BACKEND: Test threat string not found in page ${pageNumber} content`);
-            console.log(`🤖 BACKEND: Searched for: "${testThreatString}"`);
-            console.log(`🤖 BACKEND: In content: "${textContent.substring(0, 200)}..."`);
-            return [];
-        }
-
-        // OPTIONAL: Also run real AI analysis for comparison (commented out for development)
-        /*
-        console.log(`🤖 BACKEND: Running real AI analysis for comparison...`);
-        const aiThreats = await analyzePageForThreatsWithAI(textContent, pageNumber);
-        return [...mockThreats, ...aiThreats];
-        */
-
-    } catch (error) {
-        console.error(`❌ BACKEND: Error analyzing page ${pageNumber}:`, error);
-        return [];
-    }
-}
-
 //AI_HELPER FXN
-async function analyzePageForThreatsWithAI(textContent: string, pageNumber: number) {
-    try {
-        console.log(`🤖 BACKEND: Running REAL AI analysis for page ${pageNumber}`);
+async function analyzePageForThreatsWithAI(
+  textContent: string,
+  pageNumber: number
+) {
+  try {
+    console.log(`🤖 BACKEND: Running REAL AI analysis for page ${pageNumber}`);
 
-        const prompt = `Analyze the following legal document text for potentially problematic clauses, unfavorable terms, and legal risks. 
+    const prompt = `Analyze the following legal document text for potentially problematic clauses, unfavorable terms, and legal risks. 
     Focus on detecting:
     - Liability limitations that may disadvantage the reader
     - Indemnification clauses that shift excessive risk
@@ -115,172 +75,246 @@ async function analyzePageForThreatsWithAI(textContent: string, pageNumber: numb
     Legal document text to analyze:
     ${textContent}`;
 
-        const result = await model.generateContent(prompt);
-        const response = await result.response;
-        const text = response.text();
+    const result = await model.generateContent(prompt);
+    const response = await result.response;
+    const text = response.text();
 
-        console.log(`🤖 BACKEND: Raw response: ${text.substring(0, 500)}...`);
+    console.log(`🤖 BACKEND: Raw response: ${text.substring(0, 500)}...`);
 
-        // Extract JSON from response
-        let jsonData = null;
+    // Extract JSON from response
+    let jsonData = null;
 
-        // Try to find JSON in code block
-        let jsonMatch = text.match(/```json\s*([\s\S]*?)\s*```/);
-        if (!jsonMatch) {
-            // Try to find raw JSON
-            jsonMatch = text.match(/\{[\s\S]*\}/);
-        }
-
-        if (jsonMatch) {
-            const jsonText = jsonMatch[1] || jsonMatch[0];
-            console.log(`🤖 BACKEND: Extracted JSON: ${jsonText}`);
-
-            try {
-                jsonData = JSON.parse(jsonText);
-                console.log(`🤖 BACKEND: Successfully parsed JSON`);
-            } catch (parseError: any) {
-                console.log(`🤖 BACKEND: JSON parsing failed: ${parseError.message}`);
-            }
-        } else {
-            console.log(`🤖 BACKEND: No JSON pattern found in response`);
-        }
-
-        // Validate and return threats
-        if (jsonData && jsonData.threats && Array.isArray(jsonData.threats)) {
-            const validThreats = jsonData.threats.filter((threat: any) =>
-                threat.exactStringThreat && threat.explanation
-            );
-
-            console.log(`🤖 BACKEND: Found ${validThreats.length} valid threats`);
-            return validThreats;
-        } else {
-            console.log(`🤖 BACKEND: No valid threats structure found`);
-            return [];
-        }
-
-    } catch (error) {
-        console.error(`❌ BACKEND: Gemini AI error for page ${pageNumber}:`, error);
-        return [];
+    // Try to find JSON in code block
+    let jsonMatch = text.match(/```json\s*([\s\S]*?)\s*```/);
+    if (!jsonMatch) {
+      // Try to find raw JSON
+      jsonMatch = text.match(/\{[\s\S]*\}/);
     }
+
+    if (jsonMatch) {
+      const jsonText = jsonMatch[1] || jsonMatch[0];
+      console.log(`🤖 BACKEND: Extracted JSON: ${jsonText}`);
+
+      try {
+        jsonData = JSON.parse(jsonText);
+        console.log(`🤖 BACKEND: Successfully parsed JSON`);
+      } catch (parseError: any) {
+        console.log(`🤖 BACKEND: JSON parsing failed: ${parseError.message}`);
+      }
+    } else {
+      console.log(`🤖 BACKEND: No JSON pattern found in response`);
+    }
+
+    // Validate and return threats
+    if (jsonData && jsonData.threats && Array.isArray(jsonData.threats)) {
+      const validThreats = jsonData.threats.filter(
+        (threat: any) => threat.exactStringThreat && threat.explanation
+      );
+
+      console.log(`🤖 BACKEND: Found ${validThreats.length} valid threats`);
+      return validThreats;
+    } else {
+      console.log(`🤖 BACKEND: No valid threats structure found`);
+      return [];
+    }
+  } catch (error) {
+    console.error(`❌ BACKEND: Gemini AI error for page ${pageNumber}:`, error);
+    return [];
+  }
 }
 
 //MAIN FUNCTION
 export const analyzePdfContent = async (req: Request, res: Response) => {
-    try {
-        console.log('\n🔥 ===============================================');
-        console.log('📥 BACKEND: NEW PDF CONTENT ANALYSIS REQUEST');
-        console.log('🔥 ===============================================');
+  try {
+    // Handle both GET (query params) and POST (body params) requests
+    const documentId =
+      req.method === "GET" ? (req.query.docId as string) : req.body.documentId;
+    const pagesContent = req.method === "GET" ? null : req.body.pagesContent;
+    const userId = req.user?.id;
 
-        console.log('📥 BACKEND: Request headers:', {
-            'content-type': req.headers['content-type'],
-            'content-length': req.headers['content-length']
-        });
-
-        const { pagesContent } = req.body;
-
-        // Validate input structure
-        if (!pagesContent || !Array.isArray(pagesContent)) {
-            console.log('❌ BACKEND: Invalid pagesContent data');
-            return res.status(400).json({
-                success: false,
-                error: "pagesContent array is required",
-                expectedFormat: {
-                    pagesContent: [
-                        { page: 1, selectionApiContent: "text content from page 1..." },
-                        { page: 2, selectionApiContent: "text content from page 2..." }
-                    ]
-                }
-            });
-        }
-
-        console.log(`📥 BACKEND: Processing ${pagesContent.length} pages`);
-        console.log('📊 BACKEND: Pages data structure:');
-        pagesContent.forEach((pageData: any, index: number) => {
-            console.log(`  Page ${index + 1}:`, {
-                page: pageData.page,
-                contentLength: pageData.selectionApiContent?.length || 0,
-                contentPreview: pageData.selectionApiContent?.substring(0, 100) + '...'
-            });
-        });
-
-        const allThreats: any[] = [];
-        let threatNumber = 1;
-
-        // Process each page
-        for (const pageData of pagesContent) {
-            const { page, selectionApiContent } = pageData;
-
-            if (!selectionApiContent || typeof selectionApiContent !== 'string') {
-                console.log(`⚠️ BACKEND: Skipping page ${page} - no valid content`);
-                continue;
-            }
-
-            console.log(`\n🔍 BACKEND: Analyzing page ${page}...`);
-
-            // Analyze this page for threats (here use the helper fxns AI or dummy)
-            const pageThreats = await analyzePageForThreatsWithAI(selectionApiContent, page);
-
-            // Add threat numbers and page info
-            for (const threat of pageThreats) {
-                allThreats.push({
-                    ...threat,
-                    number: threatNumber++,
-                    page: page
-                });
-            }
-
-            console.log(`✅ BACKEND: Page ${page} analysis complete. Found ${pageThreats.length} threats.`);
-        }
-
-        console.log(`\n🎯 BACKEND: ANALYSIS COMPLETE`);
-        console.log(`📊 BACKEND: Total threats found: ${allThreats.length}`);
-        console.log(`📋 BACKEND: Threat summary:`);
-        allThreats.forEach((threat, index) => {
-            console.log(`  ${index + 1}. Page ${threat.page}: "${threat.exactStringThreat.substring(0, 50)}..."`);
-        });
-
-        // Return results in expected format
-        const response = {
-            success: true,
-            threats: allThreats,
-            summary: {
-                totalPages: pagesContent.length,
-                totalThreats: allThreats.length,
-                analysisTimestamp: new Date().toISOString()
-            }
-        };
-
-        console.log('\n📤 BACKEND: Sending response to frontend');
-        console.log('📊 BACKEND: Response structure:', {
-            success: response.success,
-            threatCount: response.threats.length,
-            summaryInfo: response.summary
-        });
-
-        res.json(response);
-
-    } catch (error: any) {
-        console.error('❌ BACKEND: Analysis failed:', error);
-        res.status(500).json({
-            success: false,
-            error: "Internal server error during threat analysis",
-            message: error.message
-        });
-    }
-};
-
-//HEALT-CHECKPOINT
-export const healthCheck = async (_req: Request, res: Response) => {
-    console.log('🏥 BACKEND: Health check requested');
-    res.json({
-        status: "OK",
-        message: "Threat Analyzer Backend is running",
-        endpoints: {
-            "POST /threats/analyze-pdf-content": "Main threat analysis endpoint",
-            "GET /threats/health": "Health check endpoint"
+    if (!documentId) {
+      return sendResponse({
+        res,
+        success: false,
+        error: {
+          message: "Document ID is required",
         },
-        timestamp: new Date().toISOString()
+        statusCode: 400,
+      });
+    }
+
+    // Verify user owns the document
+    const document = await prisma.document.findFirst({
+      where: {
+        id: documentId,
+        userId,
+        deletedAt: null,
+      },
     });
+
+    if (!document) {
+      return sendResponse({
+        res,
+        success: false,
+        error: {
+          message: "Document not found or access denied",
+        },
+        statusCode: 404,
+      });
+    }
+
+    // Check if threats already exist for this document
+    const existingThreats = await prisma.threat.findMany({
+      where: {
+        documentId,
+      },
+      orderBy: [{ pageNumber: "asc" }, { threatNumber: "asc" }],
+    });
+
+    if (existingThreats.length > 0) {
+      return sendResponse({
+        res,
+        success: true,
+        data: {
+          threats: existingThreats.map((threat) => ({
+            id: threat.id,
+            exactStringThreat: threat.text,
+            explanation: threat.explanation,
+            severity: threat.severity,
+            category: threat.category,
+            page: threat.pageNumber,
+            number: threat.threatNumber,
+            confidence: threat.confidence,
+            position: threat.position,
+          })),
+          summary: {
+            totalThreats: existingThreats.length,
+            isFromCache: true,
+          },
+        },
+        message: "Threats retrieved from database",
+      });
+    }
+
+    // If no existing threats, we need the pagesContent to analyze
+    if (!pagesContent || !Array.isArray(pagesContent)) {
+      return sendResponse({
+        res,
+        success: false,
+        error: {
+          message:
+            req.method === "GET"
+              ? "No threats found for this document. Use POST with pagesContent to analyze."
+              : "pagesContent array is required for new analysis",
+        },
+        statusCode: req.method === "GET" ? 404 : 400,
+      });
+    }
+
+    console.log(`🔍 BACKEND: Analyzing document ${documentId} for threats...`);
+    console.log(`📥 BACKEND: Processing ${pagesContent.length} pages`);
+
+    const allThreats: any[] = [];
+    let threatNumber = 1;
+
+    // Process each page
+    for (const pageData of pagesContent) {
+      const { page, selectionApiContent } = pageData;
+
+      if (!selectionApiContent || typeof selectionApiContent !== "string") {
+        console.log(`⚠️ BACKEND: Skipping page ${page} - no valid content`);
+        continue;
+      }
+
+      console.log(`\n🔍 BACKEND: Analyzing page ${page}...`);
+
+      // Analyze this page for threats using AI
+      const pageThreats = await analyzePageForThreatsWithAI(
+        selectionApiContent,
+        page
+      );
+
+      // Save each threat to database and add to results
+      for (const threat of pageThreats) {
+        const savedThreat = await prisma.threat.create({
+          data: {
+            documentId,
+            text: threat.exactStringThreat,
+            explanation: threat.explanation,
+            pageNumber: page,
+            threatNumber: threatNumber,
+            severity: threat.severity?.toUpperCase() || "HIGH",
+            category: threat.category || "Unknown",
+            confidence: 1.0,
+            position: {}, // You can enhance this based on your needs
+          },
+        });
+
+        allThreats.push({
+          id: savedThreat.id,
+          exactStringThreat: threat.exactStringThreat,
+          explanation: threat.explanation,
+          severity: threat.severity,
+          category: threat.category,
+          page: page,
+          number: threatNumber,
+          confidence: 1.0,
+          position: {},
+        });
+
+        threatNumber++;
+      }
+
+      console.log(
+        `✅ BACKEND: Page ${page} analysis complete. Found ${pageThreats.length} threats.`
+      );
+    }
+
+    console.log(`\n🎯 BACKEND: ANALYSIS COMPLETE`);
+    console.log(`📊 BACKEND: Total threats found: ${allThreats.length}`);
+
+    return sendResponse({
+      res,
+      success: true,
+      data: {
+        threats: allThreats,
+        summary: {
+          totalPages: pagesContent.length,
+          totalThreats: allThreats.length,
+          analysisTimestamp: new Date().toISOString(),
+          isFromCache: false,
+        },
+      },
+      message: "Threat analysis completed successfully",
+    });
+  } catch (error: any) {
+    console.error("❌ BACKEND: Analysis failed:", error);
+    return sendResponse({
+      res,
+      success: false,
+      error: {
+        message: getErrorMessage(
+          error,
+          "Failed to analyze document for threats"
+        ),
+        details: error,
+      },
+      statusCode: 500,
+    });
+  }
 };
 
-
+//HEALTH-CHECKPOINT
+export const healthCheck = async (_req: Request, res: Response) => {
+  console.log("🏥 BACKEND: Health check requested");
+  res.json({
+    status: "OK",
+    message: "Threat Analyzer Backend is running",
+    endpoints: {
+      "GET /threats?docId=<docId>":
+        "Get/analyze threats for a document (requires auth)",
+      "GET /threats/health": "Health check endpoint",
+    },
+    timestamp: new Date().toISOString(),
+  });
+};

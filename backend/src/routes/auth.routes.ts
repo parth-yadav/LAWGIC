@@ -8,8 +8,8 @@ import {
   logoutUser,
   refreshUserToken,
   updateUser,
-} from "@/controllers/auth.controllers";
-import validToken from "@/middlewares/validToken";
+} from "../controllers/auth.controllers.js";
+import validToken from "../middlewares/validToken.js";
 import express from "express";
 
 const authRouter = express.Router();

@@ -25,13 +25,13 @@ export default function CTA() {
           <Reveal type="bottomUp" duration={0.8}>
             <div className="inline-flex items-center px-4 py-2 rounded-full text-sm bg-secondary/20 text-primary border border-secondary/30 mb-6 hover:bg-secondary/30 hover:scale-105 transition-all duration-300">
               <ScaleIcon className="w-4 h-4 mr-2 animate-pulse" />
-              Ready to Understand Legal Documents?
+              Ready to Test Our Legal Document AI?
             </div>
           </Reveal>
 
           <Reveal type="bottomUp" duration={0.8} delay={0.2}>
             <h2 className="text-3xl md:text-5xl lg:text-6xl font-bold text-primary mb-6 leading-tight">
-              Start Analyzing Documents
+              Try Our Prototype
               <span className="block bg-gradient-to-r from-secondary via-primary to-foreground bg-clip-text text-transparent animate-gradient-x bg-300%">
                 Today
               </span>
@@ -40,11 +40,11 @@ export default function CTA() {
 
           <Reveal type="bottomUp" duration={0.8} delay={0.4}>
             <p className="text-xl md:text-2xl text-muted-foreground mb-8 max-w-2xl mx-auto leading-relaxed">
-              Join{" "}
+              Experience{" "}
               <span className="text-secondary font-bold">
-                thousands of people
+                our AI-powered prototype
               </span>{" "}
-              who now understand their legal documents. Get clear insights in{" "}
+              that helps you understand legal documents. Get clear insights in{" "}
               <span className="text-secondary font-bold">
                 minutes, not hours
               </span>
@@ -60,7 +60,7 @@ export default function CTA() {
                   className="group text-lg px-8 py-6 rounded-full relative overflow-hidden transition-all duration-300 hover:scale-105 hover:shadow-2xl hover:shadow-primary/25"
                 >
                   <span className="relative z-10 flex items-center">
-                    Try It Free
+                    Try Prototype
                     <ArrowRightIcon className="ml-2 h-5 w-5 group-hover:translate-x-1 transition-transform duration-300" />
                   </span>
                   <div className="absolute inset-0 bg-gradient-to-r from-primary/0 via-white/20 to-primary/0 -translate-x-full group-hover:translate-x-full transition-transform duration-1000"></div>
@@ -82,22 +82,22 @@ export default function CTA() {
               {[
                 {
                   icon: CheckCircleIcon,
-                  title: "Free to Try",
-                  subtitle: "No Credit Card Required",
+                  title: "Free Prototype",
+                  subtitle: "No Account Required",
                 },
                 {
                   icon: ZapIcon,
                   title: "Instant Results",
-                  subtitle: "Upload & Analyze",
+                  subtitle: "Upload & Test AI Analysis",
                 },
                 {
                   icon: ShieldCheckIcon,
-                  title: "Secure & Private",
-                  subtitle: "Your Documents Stay Safe",
+                  title: "Demo Environment",
+                  subtitle: "Safe Testing Space",
                 },
               ].map((feature) => (
                 <div key={feature.title} className="group text-center">
-                  <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-br from-primary to-foreground text-primary-foreground mb-4 group-hover:scale-110 group-hover:rotate-3 transition-all duration-300">
+                  <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-br from-primary/10 to-secondary/10 text-primary mb-4 group-hover:scale-110 group-hover:rotate-3 transition-all duration-300">
                     <feature.icon className="w-8 h-8" />
                   </div>
                   <div className="text-sm text-muted-foreground mb-2 group-hover:text-muted-foreground/80 transition-colors duration-300">

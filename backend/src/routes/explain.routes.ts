@@ -1,8 +1,8 @@
 import {
   explainText,
   getExplanationsByDocument,
-} from "@/controllers/explain.controllers";
-import validToken from "@/middlewares/validToken";
+} from "../controllers/explain.controllers.js";
+import validToken from "../middlewares/validToken.js";
 import express from "express";
 
 const explainRouter = express.Router();

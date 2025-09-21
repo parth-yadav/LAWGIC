@@ -2,12 +2,12 @@ import express from "express";
 import cors from "cors";
 import dotenv from "dotenv";
 import cookieParser from "cookie-parser";
-import authRouter from "./routes/auth.routes";
-import validateEnv from "./utils/validateEnv";
-import explainRouter from "./routes/explain.routes";
-import documentRouter from "./routes/document.routes";
-import threatRouter from "./routes/threat.routes";
-import highlightRouter from "./routes/highlight.routes";
+import authRouter from "./routes/auth.routes.js";
+import validateEnv from "./utils/validateEnv.js";
+import explainRouter from "./routes/explain.routes.js";
+import documentRouter from "./routes/document.routes.js";
+import threatRouter from "./routes/threat.routes.js";
+import highlightRouter from "./routes/highlight.routes.js";
 
 dotenv.config();
 

@@ -38,6 +38,7 @@ import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { formatTimestamp } from "@/utils/utils";
 import Link from "next/link";
+import DocumentMenu from "@/components/documents/DocumentMenu";
 
 export default function DashboardPage() {
   const { loading, documents, error, refreshDocuments } = useDocuments();
@@ -325,30 +326,11 @@ export default function DashboardPage() {
                 view === "grid" ? "w-full" : "ml-auto",
               )}
             >
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button
-                    onClick={(e) => e.stopPropagation()}
-                    variant={"outline"}
-                    className={view === "grid" ? "w-full" : ""}
-                  >
-                    <EllipsisIcon />
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent
-                  onClick={(e) => e.stopPropagation()}
-                  className="flex w-40 flex-col gap-2"
-                >
-                  <Link href={`/documents/${doc.id}`} target={"_blank"}>
-                    <Button variant={"outline"} className="w-full">
-                      <ExternalLinkIcon />
-                      Open
-                    </Button>
-                  </Link>
-                  <RenameDocument document={doc} onRename={refreshDocuments} />
-                  <DeleteButton document={doc} onDelete={refreshDocuments} />
-                </PopoverContent>
-              </Popover>
+              <DocumentMenu
+                className={view === "grid" ? "w-full" : ""}
+                doc={doc}
+                refreshDocuments={refreshDocuments}
+              />
             </div>
           </div>
         ))}

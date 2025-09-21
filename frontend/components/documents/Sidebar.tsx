@@ -1,7 +1,7 @@
 "use client";
 import { cn } from "@/lib/utils";
 import { Button } from "../ui/button";
-import { LucideLayoutDashboard, PanelLeftOpenIcon } from "lucide-react";
+import { PanelLeftOpenIcon } from "lucide-react";
 import { Separator } from "../ui/separator";
 import { motion, AnimatePresence } from "motion/react";
 import useLocalState from "@/hooks/useLocalState";
@@ -32,7 +32,7 @@ export default function DocumentSidebar({ className }: { className?: string }) {
     <nav
       className={cn(
         "bg-sidebar text-sidebar-foreground border-sidebar-border border-r shadow-md",
-        "flex h-full flex-col gap-2 p-2 pb-4",
+        "flex h-full max-w-80 flex-col gap-2 p-2 pb-4",
         className,
       )}
     >
@@ -43,6 +43,7 @@ export default function DocumentSidebar({ className }: { className?: string }) {
               initial={{ opacity: 0, width: 0 }}
               animate={{ opacity: 1, width: "auto" }}
               exit={{ opacity: 0, width: 0 }}
+              className="truncate"
             >
               Documents
             </motion.h1>
@@ -55,7 +56,7 @@ export default function DocumentSidebar({ className }: { className?: string }) {
           className={cn(expanded ? "ml-auto" : "mx-auto", "group relative")}
         >
           <PanelLeftOpenIcon className={cn(expanded && "rotate-180")} />
-          <span className="bg-primary text-primary-foreground absolute left-full z-50 max-w-0 origin-left scale-x-0 transform overflow-hidden rounded-lg px-2 py-0.5 font-light opacity-0 transition-all duration-150 ease-in-out group-hover:max-w-xs group-hover:scale-x-100 group-hover:opacity-100">
+          <span className="bg-primary text-primary-foreground absolute left-full z-100 max-w-0 origin-left scale-x-0 transform overflow-hidden rounded-lg px-2 py-0.5 font-light opacity-0 transition-all duration-150 ease-in-out group-hover:max-w-xs group-hover:scale-x-100 group-hover:opacity-100">
             {expanded ? "Collapse" : "Expand"}
           </span>
         </Button>
@@ -77,11 +78,12 @@ export default function DocumentSidebar({ className }: { className?: string }) {
                   initial={{ opacity: 0, width: 0 }}
                   animate={{ opacity: 1, width: "auto" }}
                   exit={{ opacity: 0, width: 0 }}
+                  className="truncate"
                 >
                   {link.name}
                 </motion.span>
               ) : (
-                <span className="bg-primary text-primary-foreground absolute left-full z-50 max-w-0 origin-left scale-x-0 transform overflow-hidden rounded-lg px-2 py-0.5 font-light opacity-0 transition-all duration-150 ease-in-out group-hover:max-w-xs group-hover:scale-x-100 group-hover:opacity-100">
+                <span className="bg-primary text-primary-foreground absolute left-full z-50 max-w-0 origin-left scale-x-0 transform truncate overflow-hidden rounded-lg px-2 py-0.5 font-light opacity-0 transition-all duration-150 ease-in-out group-hover:max-w-xs group-hover:scale-x-100 group-hover:opacity-100">
                   Dashboard
                 </span>
               )}
@@ -103,7 +105,12 @@ export default function DocumentSidebar({ className }: { className?: string }) {
 
       <Separator />
 
-      <div className="flex flex-col gap-1">
+      <div
+        className={cn(
+          "flex flex-1 flex-col",
+          expanded ? "overflow-y-scroll" : "overflow-hidden",
+        )}
+      >
         {documents.map((doc) => (
           <Link
             href={`/documents/${doc.id}`}
@@ -122,15 +129,17 @@ export default function DocumentSidebar({ className }: { className?: string }) {
                     initial={{ opacity: 0, width: 0 }}
                     animate={{ opacity: 1, width: "auto" }}
                     exit={{ opacity: 0, width: 0 }}
-                    className="flex flex-col items-start leading-tight font-light"
+                    className="flex w-full flex-col items-start overflow-hidden leading-tight font-light"
                   >
-                    <span>{doc.title}</span>
-                    <span className="text-muted-foreground text-xs">
+                    <span className="w-full truncate text-left">
+                      {doc.title}
+                    </span>
+                    <span className="text-muted-foreground w-full truncate text-left text-xs">
                       {doc.fileName}
                     </span>
                   </motion.div>
                 ) : (
-                  <span className="bg-primary text-primary-foreground absolute left-full z-50 max-w-0 origin-left scale-x-0 transform overflow-hidden rounded-lg px-2 py-0.5 font-light opacity-0 transition-all duration-150 ease-in-out group-hover:max-w-xs group-hover:scale-x-100 group-hover:opacity-100">
+                  <span className="bg-primary text-primary-foreground absolute left-full z-50 max-w-0 origin-left scale-x-0 transform truncate overflow-hidden rounded-lg px-2 py-0.5 font-light opacity-0 transition-all duration-150 ease-in-out group-hover:max-w-xs group-hover:scale-x-100 group-hover:opacity-100">
                     {doc.title}
                   </span>
                 )}
@@ -140,11 +149,13 @@ export default function DocumentSidebar({ className }: { className?: string }) {
         ))}
       </div>
 
-      <div className="flex-1" />
-
       <Separator />
 
-      <UserButton variant={"expandable"} expanded={expanded} />
+      <UserButton
+        variant={"expandable"}
+        expanded={expanded}
+        className="w-full"
+      />
     </nav>
   );
 }

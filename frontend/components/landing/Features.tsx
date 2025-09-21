@@ -13,6 +13,7 @@ import {
 import { useState, useEffect, useRef } from "react";
 import { motion, useInView, useAnimation } from "framer-motion";
 import { useRouter } from "next/navigation";
+import useIsMobile from "@/hooks/useIsMobile";
 
 const features = [
   {
@@ -57,11 +58,19 @@ export default function Features() {
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
   const sectionRef = useRef<HTMLElement>(null);
   const router = useRouter();
-  const isInView = useInView(sectionRef, { amount: 0.7 });
+  const isMobile = useIsMobile();
+  const isInView = useInView(sectionRef, { 
+    amount: isMobile ? 0.3 : 0.7 
+  });
   const controls = useAnimation();
   const ringControls = useAnimation();
 
   useEffect(() => {
+    if (isMobile) {
+      // On mobile, no ring animation needed - static layout
+      return;
+    }
+
     if (isInView) {
       // Stop ring rotation and move to positions
       ringControls.start({ rotate: 0, transition: { duration: 0.2 } });
@@ -82,7 +91,7 @@ export default function Features() {
       });
       controls.start("ring");
     }
-  }, [isInView, controls, ringControls]);
+  }, [isInView, controls, ringControls, isMobile]);
 
   const handleFeatureClick = () => {
     router.push("/dashboard");
@@ -126,7 +135,7 @@ export default function Features() {
     };
   };
 
-  // Feature item variants
+  // Feature item variants (for desktop only)
   const ballVariants = {
     ring: (index: number) => {
       const ringPos = getRingPosition(index);
@@ -135,7 +144,7 @@ export default function Features() {
         y: ringPos.y,
         scale: 1,
         opacity: 1,
-        borderRadius: "50%",
+        borderRadius: "100%",
         width: 80,
         height: 80,
         left: -40, // Center for 80px circles
@@ -187,7 +196,7 @@ export default function Features() {
     }
   };
 
-  // Content variants for cards
+  // Content variants for cards (desktop only)
   const contentVariants = {
     ring: { 
       opacity: 0,
@@ -230,8 +239,8 @@ export default function Features() {
     }
   };
 
-  // Icon variants
-    const iconVariants = {
+  // Icon variants (desktop only)
+  const iconVariants = {
     ring: { 
       scale: 1.2,
       opacity: 1,
@@ -253,20 +262,20 @@ export default function Features() {
     <section
       id="features"
       ref={sectionRef}
-      className="min-h-screen flex flex-col justify-center py-20 relative overflow-visible"
+      className="py-20 relative overflow-visible"
     >
       <div className="">
         <div className="text-center mb-20">
           <Reveal type="bottomUp" duration={0.8}>
             <h2 className="text-4xl md:text-6xl font-bold text-foreground mb-6">
               Powerful{" "}
-              <span className="bg-gradient-to-r from-secondary via-primary to-secondary bg-clip-text text-transparent">
+              <span className="text-primary">
                 Features
               </span>
             </h2>
           </Reveal>
           <Reveal type="bottomUp" duration={0.8} delay={0.2}>
-            <p className="text-xl text-muted-foreground max-w-3xl mx-auto leading-relaxed">
+            <p className="text-xl text-muted-foreground max-w-3xl mx-auto leading-relaxed px-4">
               Everything you need to understand and analyze legal documents with
               confidence and clarity.
             </p>
@@ -274,83 +283,133 @@ export default function Features() {
         </div>
 
         {/* Features Container */}
-        <div className="relative w-full min-h-[800px] flex items-center justify-center">
-          {/* Rotating ring container */}
-          <motion.div
-            className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2"
-            animate={ringControls}
-            style={{
-              originX: 0.5,
-              originY: 0.5,
-            }}
-          >
-            {/* Features as balls/cards */}
-            {features.map((feature, index) => (
-              <motion.div
-                key={feature.title}
-                className="absolute"
-                custom={index}
-                variants={ballVariants}
-                initial="ring"
-                animate={controls}
-                style={{
-                  originX: 0.5,
-                  originY: 0.5,
-                  zIndex: 10,
-                }}
-              >
-              <div 
-                className="relative cursor-pointer bg-background/90 backdrop-blur-sm border border-border/50 overflow-hidden"
-                onClick={handleFeatureClick}
-                style={{ width: "100%", height: "100%" }}
-              >
-                
-                {/* Icon - always visible */}
-                <div className="absolute inset-0 flex items-center justify-center">
-                  <motion.div 
-                    variants={iconVariants}
-                    animate={controls}
-                    className="p-3 rounded-2xl bg-gradient-to-br from-primary/10 to-secondary/10"
-                  >
-                    <feature.icon className="text-primary h-8 w-8" />
-                  </motion.div>
-                </div>
-
-                 {/* Card content - only visible when expanded */}
-                <motion.div 
-                  className="p-6 h-full flex flex-col justify-center"
-                  variants={contentVariants}
-                  animate={controls}
+        <div className={`relative w-full flex items-center justify-center px-4 ${
+          isMobile ? 'min-h-[600px]' : 'min-h-[500px]'
+        }`}>
+          {isMobile ? (
+            /* Mobile: Static single column layout */
+            <div className="flex flex-col items-center space-y-6 w-full max-w-sm">
+              {features.map((feature, index) => (
+                <motion.div
+                  key={feature.title}
+                  className="w-full"
+                  initial={{ opacity: 0, y: 50 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ 
+                    duration: 0.6, 
+                    delay: index * 0.1,
+                    ease: "easeOut"
+                  }}
                 >
-                  <motion.div 
-                    className="mb-4"
-                    variants={cardIconVariants}
-                    animate={controls}
+                  <div 
+                    className="relative cursor-pointer bg-background/90 backdrop-blur-sm border border-border/50 overflow-hidden rounded-2xl h-48 w-full"
+                    onClick={handleFeatureClick}
                   >
-                    <div className="inline-flex p-3 rounded-2xl bg-gradient-to-br from-primary/10 to-secondary/10">
-                      <feature.icon className="text-primary h-8 w-8" />
-                    </div>
-                  </motion.div>
+                    {/* Mobile card content */}
+                    <div className="p-4 h-full flex flex-col justify-center">
+                      <div className="mb-4">
+                        <div className="inline-flex p-3 rounded-2xl bg-gradient-to-br from-primary/10 to-secondary/10">
+                          <feature.icon className="text-primary h-6 w-6" />
+                        </div>
+                      </div>
 
-                  <div className="space-y-3">
-                    <h3 className="text-lg font-bold text-foreground">
-                      {feature.title}
-                    </h3>
+                      <div className="space-y-3">
+                        <h3 className="text-base font-bold text-foreground">
+                          {feature.title}
+                        </h3>
 
-                    <p className="text-sm text-muted-foreground leading-relaxed">
-                      {feature.description}
-                    </p>
+                        <p className="text-xs text-muted-foreground leading-relaxed">
+                          {feature.description}
+                        </p>
 
-                    <div className="flex items-center text-primary font-semibold text-sm opacity-0">
-                      Explore feature
-                      <ArrowRightIcon className="ml-2 h-4 w-4" />
+                        <div className="flex items-center text-primary font-semibold text-xs opacity-70">
+                          Explore feature
+                          <ArrowRightIcon className="ml-2 h-3 w-3" />
+                        </div>
+                      </div>
                     </div>
                   </div>
                 </motion.div>
-              </div>
+              ))}
+            </div>
+          ) : (
+            /* Desktop: Rotating ring container */
+            <motion.div
+              className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2"
+              animate={ringControls}
+              style={{
+                originX: 0.5,
+                originY: 0.5,
+              }}
+            >
+              {/* Features as balls/cards */}
+              {features.map((feature, index) => (
+                <motion.div
+                  key={feature.title}
+                  className="absolute"
+                  custom={index}
+                  variants={ballVariants}
+                  initial="ring"
+                  animate={controls}
+                  style={{
+                    originX: 0.5,
+                    originY: 0.5,
+                    zIndex: 10,
+                  }}
+                >
+                  <div 
+                    className="relative cursor-pointer bg-background/90 backdrop-blur-sm  overflow-hidden"
+                    onClick={handleFeatureClick}
+                    style={{ width: "100%", height: "100%" }}
+                  >
+                    
+                    {/* Icon - always visible */}
+                    <div className="absolute inset-0 flex items-center justify-center">
+                      <motion.div 
+                        variants={iconVariants}
+                        animate={controls}
+                        className="p-3 rounded-full bg-gradient-to-br from-primary/10 to-secondary/10"
+                      >
+                        <feature.icon className="text-primary h-8 w-8" />
+                      </motion.div>
+                    </div>
+
+                     {/* Card content - only visible when expanded */}
+                    <motion.div 
+                      className="p-6 h-full flex flex-col justify-center"
+                      variants={contentVariants}
+                      animate={controls}
+                    >
+                      <motion.div 
+                        className="mb-4"
+                        variants={cardIconVariants}
+                        animate={controls}
+                      >
+                        <div className="inline-flex p-3 rounded-2xl bg-gradient-to-br from-primary/10 to-secondary/10">
+                          <feature.icon className="text-primary h-8 w-8" />
+                        </div>
+                      </motion.div>
+
+                      <div className="space-y-3">
+                        <h3 className="text-lg font-bold text-foreground">
+                          {feature.title}
+                        </h3>
+
+                        <p className="text-sm text-muted-foreground leading-relaxed">
+                          {feature.description}
+                        </p>
+
+                        <div className="flex items-center text-primary font-semibold text-sm opacity-0">
+                          Explore feature
+                          <ArrowRightIcon className="ml-2 h-4 w-4" />
+                        </div>
+                      </div>
+                    </motion.div>
+                  </div>
+                </motion.div>
+              ))}
             </motion.div>
-          ))}
-          </motion.div>
+          )}
         </div>
 
         {/* Scroll indicator */}

@@ -13,13 +13,13 @@ export default function Hero() {
         <div className="text-center max-w-4xl mx-auto">
           <Reveal type="bottomUp" duration={0.8} once={true}>
             <div className="flex flex-col sm:flex-row gap-3 justify-center items-center mb-6">
-              <div className="inline-flex items-center px-3 py-1 rounded-full text-sm bg-primary/20 text-foreground border border-primary/30">
-                <Cog className="w-4 h-4 mr-2" />
-                Made by byteUS
+              <div className="inline-flex items-center px-3 py-1 rounded-full text-sm bg-primary text-secondary border border-primary">
+              <Cog className="w-4 h-4 mr-2 text-accent" />
+              Made by byteUS
               </div>
-              <div className="inline-flex items-center px-3 py-1 rounded-full text-sm bg-primary/20 text-foreground border border-primary/30">
-                <SparklesIcon className="w-4 h-4 mr-2" />
-                Powered by GEMINI
+              <div className="inline-flex items-center px-3 py-1 rounded-full text-sm bg-primary text-secondary border border-primary">
+              <SparklesIcon className="w-4 h-4 mr-2 text-accent" />
+              Powered by GEMINI
               </div>
             </div>
           </Reveal>
@@ -37,7 +37,7 @@ export default function Hero() {
           <Reveal type="bottomUp" duration={0.8} delay={0.4} once={true}>
             <h2 className="text-2xl md:text-3xl lg:text-4xl font-semibold text-foreground mb-8">
               Your Personal
-              <span className="bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">
+              <span className="text-primary">
                 {" "}
                 Legal Assistant
               </span>

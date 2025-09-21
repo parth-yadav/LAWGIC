@@ -35,20 +35,49 @@ export default async function Footer() {
         </div>
 
         {/* Bottom Section */}
-        <div className="border-border mt-8 flex flex-col items-center justify-between border-t pt-6 md:flex-row">
-          <div className="text-muted-foreground mb-4 text-sm md:mb-0">
-            © 2025 {appName}.
+        <div className="border-border mt-8 border-t pt-8">
+          <div className="flex flex-col items-center 6 md:flex-row">
+            <div className="text-muted-foreground text-sm w-full text-center">
+              © 2025 {appName}. All rights reserved.
+            </div>
+            
+            {/* Hackathon Project Badge */}
+            {/* <div className="flex items-center gap-2">
+              <div className="bg-gradient-to-r from-blue-500 to-purple-600 text-white px-3 py-1 rounded-full text-xs font-medium">
+                Hackathon Project
+              </div>
+            </div> */}
           </div>
-          <div className="flex items-center gap-4 text-sm">
-            <span className="text-muted-foreground">Developed by</span>
-            <Link
-              href="https://github.com/jayendrabharti"
-              target="_blank"
-              className="bg-muted hover:text-primary hover:ring-ring flex items-center gap-2 rounded-md px-3 py-1 font-medium transition-all hover:ring-2"
-            >
-              <BsGithub size={16} />
-              Jayendra Bharti
-            </Link>
+          
+          {/* Development Team */}
+          <div className="mt-6 text-center">
+            <h4 className="text-muted-foreground mb-4 text-sm font-medium">Developed by</h4>
+            <div className="flex flex-wrap items-center justify-center gap-4">
+              <Link
+                href="https://github.com/jayendrabharti"
+                target="_blank"
+                className="bg-muted hover:bg-muted/80 hover:text-primary hover:ring-ring flex items-center gap-2 rounded-lg px-4 py-2 font-medium transition-all hover:ring-2 hover:shadow-md"
+              >
+                <BsGithub size={16} />
+                Jayendra Bharti
+              </Link>
+              <Link
+                href="https://github.com/parth-yadav"
+                target="_blank"
+                className="bg-muted hover:bg-muted/80 hover:text-primary hover:ring-ring flex items-center gap-2 rounded-lg px-4 py-2 font-medium transition-all hover:ring-2 hover:shadow-md"
+              >
+                <BsGithub size={16} />
+                Parth Yadav
+              </Link>
+              <Link
+                href="https://github.com/Krrish2401"
+                target="_blank"
+                className="bg-muted hover:bg-muted/80 hover:text-primary hover:ring-ring flex items-center gap-2 rounded-lg px-4 py-2 font-medium transition-all hover:ring-2 hover:shadow-md"
+              >
+                <BsGithub size={16} />
+                Krrish
+              </Link>
+            </div>
           </div>
         </div>
       </div>

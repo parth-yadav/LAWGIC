@@ -15,7 +15,7 @@ export default function About() {
   ];
 
   return (
-    <section id="about" className="min-h-screen flex flex-col justify-center py-20 relative overflow-hidden">
+    <section id="about" className="py-20 relative overflow-hidden">
       <div className="container px-4 mx-auto">
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
           <div>

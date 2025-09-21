@@ -1,0 +1,138 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// #########################
+// User Management
+// ##########################
+
+model User {
+  id          String    @id @default(cuid())
+  email       String    @unique
+  phone       String?   @unique
+  name        String?
+  avatar      String?
+  dateOfBirth DateTime?
+  isAdmin     Boolean   @default(false)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  refreshTokens RefreshToken[]
+  otp           otp?
+
+  documents Document[]
+
+  @@map("users")
+}
+
+model RefreshToken {
+  id         String   @id @default(cuid())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id])
+  token      String   @unique
+  expiresAt  DateTime
+  clientInfo Json?
+  isRevoked  Boolean  @default(false)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@unique([userId, token])
+  @@map("refresh_tokens")
+}
+
+model otp {
+  id        String   @id @default(cuid())
+  userId    String   @unique
+  user      User     @relation(fields: [userId], references: [id])
+  otp       String
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("otps")
+}
+
+// #########################
+// Document Management
+// ##########################
+
+model Document {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  title     String
+  fileName  String
+  filePath  String
+  fileKey   String
+  thumbnail String?
+  pageCount Int
+  deletedAt DateTime?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  threats Threat[]
+  explanations Explanation[]
+  highlights Highlight[]
+
+  @@map("documents")
+}
+
+model Highlight {
+  id          String   @id @default(cuid())
+  documentId  String
+  document    Document @relation(fields: [documentId], references: [id])
+  pageNumber  Int
+  position    Json
+  text        String   
+  color       String   
+  note        String? 
+  explanation String?
+  tags        String[] 
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@map("highlights")
+}
+
+model Explanation {
+  id               String   @id @default(cuid())
+  documentId       String
+  document         Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  selectedText     String   @db.Text
+  explanationMeaning String @db.Text
+  pageNumber       Int
+  startOffset      Int
+  endOffset        Int
+  position         Json
+  createdAt        DateTime @default(now())
+
+  @@map("complex_terms")
+}
+
+model Threat {
+  id               String      @id @default(cuid())
+  documentId       String
+  document         Document    @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  text             String
+  explanation      String
+  pageNumber       Int
+  threatNumber     Int
+  severity         ThreatSeverity @default(HIGH)
+  category         String?     
+  confidence       Float       @default(1.0)
+  position         Json        
+  createdAt        DateTime    @default(now())
+  updatedAt        DateTime    @updatedAt
+}
+
+enum ThreatSeverity {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}

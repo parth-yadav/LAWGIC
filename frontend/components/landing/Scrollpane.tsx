@@ -1,5 +1,6 @@
 "use client";
 import React from "react";
+import Image from "next/image";
 import { ContainerScroll } from "../ui/container-scroll-animation";
 
 export function HeroScrollDemo() {
@@ -17,7 +18,7 @@ export function HeroScrollDemo() {
           </>
         }
       >
-        <img
+        <Image
           src={`/images/mainapp.webp`}
           alt="hero"
           height={720}

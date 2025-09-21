@@ -31,7 +31,7 @@ export default function Page() {
     };
 
     get();
-  }, []);
+  }, [params.documentId]);
 
   if (loading)
     return (

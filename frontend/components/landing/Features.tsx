@@ -208,7 +208,7 @@ export default function Features() {
       transition: { 
         duration: 0.6,
         delay: index * 0.05 + 0.3, // Wait for card to expand first
-        ease: "easeOut"
+        ease: "easeOut" as const
       }
     })
   };
@@ -296,7 +296,7 @@ export default function Features() {
                 key={feature.title}
                 className="absolute"
                 custom={index}
-                variants={ballVariants}
+                variants={ballVariants as any}
                 initial="ring"
                 animate={controls}
                 style={{
@@ -325,13 +325,13 @@ export default function Features() {
                   <motion.div 
                     className="p-4 h-full flex flex-col justify-center"
                     custom={index}
-                    variants={contentVariants}
+                    variants={contentVariants as any}
                     animate={controls}
                   >
                     <motion.div 
                       className="mb-3"
                       custom={index}
-                      variants={cardIconVariants}
+                      variants={cardIconVariants as any}
                       animate={controls}
                     >
                       <div className="inline-flex p-2 rounded-xl bg-gradient-to-br from-primary/10 to-secondary/10">

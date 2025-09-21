@@ -171,28 +171,30 @@ export const analyzePdfContent = async (req: Request, res: Response) => {
       orderBy: [{ pageNumber: "asc" }, { threatNumber: "asc" }],
     });
 
-    return sendResponse({
-      res,
-      success: true,
-      data: {
-        threats: existingThreats.map((threat) => ({
-          id: threat.id,
-          exactStringThreat: threat.text,
-          explanation: threat.explanation,
-          severity: threat.severity,
-          category: threat.category,
-          page: threat.pageNumber,
-          number: threat.threatNumber,
-          confidence: threat.confidence,
-          position: threat.position,
-        })),
-        summary: {
-          totalThreats: existingThreats.length,
-          isFromCache: true,
+    if (existingThreats.length > 0) {
+      return sendResponse({
+        res,
+        success: true,
+        data: {
+          threats: existingThreats.map((threat) => ({
+            id: threat.id,
+            exactStringThreat: threat.text,
+            explanation: threat.explanation,
+            severity: threat.severity,
+            category: threat.category,
+            page: threat.pageNumber,
+            number: threat.threatNumber,
+            confidence: threat.confidence,
+            position: threat.position,
+          })),
+          summary: {
+            totalThreats: existingThreats.length,
+            isFromCache: true,
+          },
         },
-      },
-      message: "Threats retrieved from database",
-    });
+        message: "Threats retrieved from database",
+      });
+    }
 
     // If no existing threats, we need the pagesContent to analyze
     if (!pagesContent || !Array.isArray(pagesContent)) {

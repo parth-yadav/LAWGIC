@@ -58,7 +58,7 @@ export default function Features() {
   const [hoveredIndex, setHoveredIndex] = useState<number | null>(null);
   const sectionRef = useRef<HTMLElement>(null);
   const router = useRouter();
-  const isInView = useInView(sectionRef, { amount: 0.3, once: false });
+  const isInView = useInView(sectionRef, { amount: 0.9, once: false });
   const controls = useAnimation();
   const ringControls = useAnimation();
 
@@ -98,7 +98,7 @@ export default function Features() {
   const getRingPosition = (index: number) => {
     const totalFeatures = features.length;
     const angle = (index / totalFeatures) * 2 * Math.PI - Math.PI / 2;
-    const radius = 150;
+    const radius = 100; // Reduced from 150
     
     return {
       x: Math.cos(angle) * radius,
@@ -112,10 +112,10 @@ export default function Features() {
     const row = Math.floor(index / cols);
     const col = index % cols;
     
-    const cardWidth = 320;
-    const cardHeight = 240;
-    const gapX = 40;
-    const gapY = 60;
+    const cardWidth = 240; // Reduced from 320
+    const cardHeight = 180; // Reduced from 240
+    const gapX = 30; // Reduced from 40
+    const gapY = 40; // Reduced from 60
     
     const totalWidth = (cardWidth * cols) + (gapX * (cols - 1));
     const totalHeight = (cardHeight * 2) + gapY;
@@ -139,10 +139,10 @@ export default function Features() {
         scale: 1,
         opacity: 1,
         borderRadius: "100%",
-        width: 80,
-        height: 80,
-        left: -40,
-        top: -40,
+        width: 60, // Reduced from 80
+        height: 60, // Reduced from 80
+        left: -30, // Adjusted from -40
+        top: -30, // Adjusted from -40
         transition: { 
           duration: 0.6, 
           ease: "easeInOut" as const,
@@ -158,10 +158,10 @@ export default function Features() {
         scale: 1,
         opacity: 1,
         borderRadius: "50%",
-        width: 80,
-        height: 80,
-        left: -40,
-        top: -40,
+        width: 60, // Reduced from 80
+        height: 60, // Reduced from 80
+        left: -30, // Adjusted from -40
+        top: -30, // Adjusted from -40
         transition: { 
           duration: 0.6, 
           ease: "easeInOut" as const,
@@ -177,10 +177,10 @@ export default function Features() {
         scale: 1,
         opacity: 1,
         borderRadius: "16px",
-        width: 320,
-        height: 240,
-        left: -160,
-        top: -120,
+        width: 240, // Reduced from 320
+        height: 180, // Reduced from 240
+        left: -120, // Adjusted from -160
+        top: -90, // Adjusted from -120
         transition: { 
           duration: 0.6, 
           ease: "easeInOut" as const,
@@ -258,12 +258,12 @@ export default function Features() {
     <section
       id="features"
       ref={sectionRef}
-      className="w-full py-20 relative bg-gradient-to-br from-background via-secondary/5 to-primary/5"
+      className="w-full h-[80vh] relative bg-gradient-to-br from-background via-secondary/5 to-primary/5 flex flex-col"
     >
-      <div className="container mx-auto px-4 relative z-10">
-        <div className="text-center mb-20">
+      <div className="container mx-auto px-4 relative z-10 flex flex-col h-full">
+        <div className="text-center mb-8 flex-shrink-0">
           <Reveal type="bottomUp" duration={0.8}>
-            <h2 className="text-4xl md:text-6xl font-bold text-foreground mb-6">
+            <h2 className="text-3xl md:text-4xl font-bold text-foreground mb-4">
               Powerful{" "}
               <span className="text-primary">
                 Features
@@ -271,7 +271,7 @@ export default function Features() {
             </h2>
           </Reveal>
           <Reveal type="bottomUp" duration={0.8} delay={0.2}>
-            <p className="text-xl text-muted-foreground max-w-3xl mx-auto leading-relaxed px-4">
+            <p className="text-lg text-muted-foreground max-w-2xl mx-auto leading-relaxed px-4">
               Everything you need to understand and analyze legal documents with
               confidence and clarity.
             </p>
@@ -279,7 +279,7 @@ export default function Features() {
         </div>
 
         {/* Features Container */}
-        <div className="relative w-full min-h-[800px] flex items-center justify-center">
+        <div className="relative w-full flex-1 flex items-center justify-center">
           {/* Rotating ring container */}
           <motion.div
             className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2"
@@ -315,42 +315,42 @@ export default function Features() {
                     <motion.div 
                       variants={iconVariants}
                       animate={controls}
-                      className="p-3 rounded-2xl bg-gradient-to-br from-primary/10 to-secondary/10"
+                      className="p-2 rounded-xl bg-gradient-to-br from-primary/10 to-secondary/10"
                     >
-                      <feature.icon className="text-primary h-8 w-8" />
+                      <feature.icon className="text-primary h-6 w-6" />
                     </motion.div>
                   </div>
 
                   {/* Card content - only visible when expanded */}
                   <motion.div 
-                    className="p-6 h-full flex flex-col justify-center"
+                    className="p-4 h-full flex flex-col justify-center"
                     custom={index}
                     variants={contentVariants}
                     animate={controls}
                   >
                     <motion.div 
-                      className="mb-4"
+                      className="mb-3"
                       custom={index}
                       variants={cardIconVariants}
                       animate={controls}
                     >
-                      <div className="inline-flex p-3 rounded-2xl bg-gradient-to-br from-primary/10 to-secondary/10">
-                        <feature.icon className="text-primary h-8 w-8" />
+                      <div className="inline-flex p-2 rounded-xl bg-gradient-to-br from-primary/10 to-secondary/10">
+                        <feature.icon className="text-primary h-6 w-6" />
                       </div>
                     </motion.div>
 
-                    <div className="space-y-3">
-                      <h3 className="text-lg font-bold text-foreground">
+                    <div className="space-y-2">
+                      <h3 className="text-base font-bold text-foreground">
                         {feature.title}
                       </h3>
 
-                      <p className="text-sm text-muted-foreground leading-relaxed">
+                      <p className="text-xs text-muted-foreground leading-relaxed">
                         {feature.description}
                       </p>
 
-                      <div className="flex items-center text-primary font-semibold text-sm opacity-75 hover:opacity-100 transition-opacity duration-300">
+                      <div className="flex items-center text-primary font-semibold text-xs opacity-75 hover:opacity-100 transition-opacity duration-300">
                         Explore feature
-                        <ArrowRightIcon className="ml-2 h-4 w-4" />
+                        <ArrowRightIcon className="ml-1 h-3 w-3" />
                       </div>
                     </div>
                   </motion.div>

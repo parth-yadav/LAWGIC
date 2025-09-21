@@ -38,7 +38,7 @@ export interface Threat {
   reason: string;
   bbox: ThreatBoundingBox | null;
   confidence: number;
-  severity?: 'low' | 'medium' | 'high' | 'critical';
+  severity?: "low" | "medium" | "high" | "critical";
   category?: string;
   position?: ThreatPosition | null;
   wordIndices?: number[];
@@ -201,6 +201,27 @@ export interface Highlight {
 // ========================================
 // SELECTION TYPES
 // ========================================
+
+/**
+ * Represents an active text selection that can become a highlight
+ *
+ * Contains information about the user's current text selection
+ * and positioning data for rendering the highlight creation UI.
+ *
+ * @interface TextSelection
+ * @property {string} text - The text that is currently selected
+ * @property {number} pageNumber - Page number where selection occurred
+ * @property {number} startOffset - Start offset of selection
+ * @property {number} endOffset - End offset of selection
+ * @property {Range} range - The DOM Range object of the selection
+ */
+export interface TextSelection {
+  text: string;
+  pageNumber: number;
+  startOffset: number;
+  endOffset: number;
+  range: Range;
+}
 
 /**
  * Represents an active text selection that can become a highlight

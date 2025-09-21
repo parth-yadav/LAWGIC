@@ -9,6 +9,9 @@ import UserButton from "../auth/UserButton";
 import { useDocuments } from "@/providers/DocumentsProvider";
 import { VscFilePdf } from "react-icons/vsc";
 import Link from "next/link";
+import { NavBarLinks } from "@/utils/navLinks";
+import AddDocument from "./AddDocument";
+import { useRouter } from "next/navigation";
 
 export default function DocumentSidebar({ className }: { className?: string }) {
   const [expanded, setExpanded] = useLocalState<boolean>(
@@ -20,7 +23,10 @@ export default function DocumentSidebar({ className }: { className?: string }) {
     documents,
     loading: documentsLoading,
     error: documentsError,
+    refreshDocuments,
   } = useDocuments();
+
+  const router = useRouter();
 
   return (
     <nav
@@ -57,24 +63,43 @@ export default function DocumentSidebar({ className }: { className?: string }) {
 
       <Separator />
 
-      <Button variant={"outline"} className="group relative justify-start">
-        <LucideLayoutDashboard />
-        <AnimatePresence>
-          {expanded ? (
-            <motion.span
-              initial={{ opacity: 0, width: 0 }}
-              animate={{ opacity: 1, width: "auto" }}
-              exit={{ opacity: 0, width: 0 }}
-            >
-              Dashboard
-            </motion.span>
-          ) : (
-            <span className="bg-primary text-primary-foreground absolute left-full z-50 max-w-0 origin-left scale-x-0 transform overflow-hidden rounded-lg px-2 py-0.5 font-light opacity-0 transition-all duration-150 ease-in-out group-hover:max-w-xs group-hover:scale-x-100 group-hover:opacity-100">
-              Dashboard
-            </span>
-          )}
-        </AnimatePresence>
-      </Button>
+      {NavBarLinks.map((link, index) => (
+        <Link href={link.href} key={index} className="w-full">
+          <Button
+            key={index}
+            variant={"outline"}
+            className="group relative w-full justify-start"
+          >
+            <link.icon />
+            <AnimatePresence>
+              {expanded ? (
+                <motion.span
+                  initial={{ opacity: 0, width: 0 }}
+                  animate={{ opacity: 1, width: "auto" }}
+                  exit={{ opacity: 0, width: 0 }}
+                >
+                  {link.name}
+                </motion.span>
+              ) : (
+                <span className="bg-primary text-primary-foreground absolute left-full z-50 max-w-0 origin-left scale-x-0 transform overflow-hidden rounded-lg px-2 py-0.5 font-light opacity-0 transition-all duration-150 ease-in-out group-hover:max-w-xs group-hover:scale-x-100 group-hover:opacity-100">
+                  Dashboard
+                </span>
+              )}
+            </AnimatePresence>
+          </Button>
+        </Link>
+      ))}
+
+      <AddDocument
+        onAdd={(docId) =>
+          refreshDocuments().then(() => {
+            if (docId) {
+              router.push(`/documents/${docId}`);
+            }
+          })
+        }
+        expanded={expanded}
+      />
 
       <Separator />
 

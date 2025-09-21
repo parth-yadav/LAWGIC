@@ -15,6 +15,7 @@ import React, {
 } from "react";
 import { LoaderCircleIcon } from "lucide-react";
 import useLocalState from "@/hooks/useLocalState";
+import ApiClient from "@/utils/ApiClient";
 import {
   Highlight,
   Threat,
@@ -60,6 +61,8 @@ type PDFContextType = {
   toggleThreatsTab: () => void;
   toolbarPosition: "top" | "bottom";
   setToolbarPosition: React.Dispatch<React.SetStateAction<"top" | "bottom">>;
+  toolbarView: "floating" | "fixed";
+  setToolbarView: React.Dispatch<React.SetStateAction<"floating" | "fixed">>;
   onLoadSuccess: ({ numPages }: { numPages: number }) => void;
   goToPrevPage: () => void;
   goToNextPage: () => void;
@@ -114,6 +117,7 @@ type PDFContextType = {
   isAnalyzing: boolean;
   setIsAnalyzing: React.Dispatch<React.SetStateAction<boolean>>;
   analyzePdfForThreats: (file: File) => Promise<void>;
+  generateThreatsAnalysis: () => Promise<void>;
   jumpToThreat: (threat: Threat, pageNumber: number) => void;
 
   highlightContextMenu: {
@@ -168,17 +172,15 @@ export const PDFProvider = ({
     "pdf-toolbar-position",
     "bottom",
   );
-  const [highlights, setHighlights] = useLocalState<Highlight[]>(
-    "highlights",
-    [],
+  const [toolbarView, setToolbarView] = useLocalState<"floating" | "fixed">(
+    "pdf-toolbar-view",
+    "fixed",
   );
-  const [storedExplanations, setStoredExplanations] = useLocalState<
+  const [highlights, setHighlights] = useState<Highlight[]>([]);
+  const [storedExplanations, setStoredExplanations] = useState<
     StoredExplanation[]
-  >("explanations", []);
-  const [storedThreats, setStoredThreats] = useLocalState<Highlight[]>(
-    "threats",
-    [],
-  );
+  >([]);
+  const [storedThreats, setStoredThreats] = useState<Highlight[]>([]);
   const [threats, setThreats] = useState<ThreatAnalysisResult | null>(null);
   const [isAnalyzing, setIsAnalyzing] = useState<boolean>(false);
   const [highlightContextMenu, setHighlightContextMenu] = useState<{
@@ -212,6 +214,150 @@ export const PDFProvider = ({
       }
     };
   }, []);
+
+  // Load existing explanations from backend when document is available
+  useEffect(() => {
+    const loadExistingExplanations = async () => {
+      if (!documentId) return;
+
+      // Create new AbortController for this request
+      const controller = new AbortController();
+
+      try {
+        const response = await ApiClient.get(
+          `/explanations?docId=${documentId}`,
+          { signal: controller.signal },
+        );
+        if (response.data.success && response.data.data) {
+          // Convert backend explanations to frontend format
+          const explanations = response.data.data.map((explanation: any) => ({
+            id: explanation.id,
+            selectedText: explanation.term,
+            explanation: {
+              term: explanation.term,
+              meaning: explanation.meaning,
+              page: explanation.page,
+            },
+            pageNumber: explanation.page,
+            startOffset: explanation.startOffset,
+            endOffset: explanation.endOffset,
+            position: explanation.position,
+            createdAt: explanation.createdAt,
+          }));
+          setStoredExplanations(explanations);
+        }
+      } catch (error: any) {
+        if (error.name !== "AbortError") {
+          console.error("Failed to load existing explanations:", error);
+        }
+      }
+    };
+
+    loadExistingExplanations();
+  }, [documentId]);
+
+  // Load existing highlights from backend when document is available
+  useEffect(() => {
+    const loadExistingHighlights = async () => {
+      if (!documentId) return;
+
+      // Create new AbortController for this request
+      const controller = new AbortController();
+
+      try {
+        const response = await ApiClient.get(
+          `/highlights?documentId=${documentId}`,
+          { signal: controller.signal },
+        );
+        if (response.data.success && response.data.data) {
+          // Convert backend highlights to frontend format
+          const backendHighlights = response.data.data.map(
+            (highlight: any) => ({
+              id: highlight.id,
+              text: highlight.text,
+              color: highlight.color,
+              position: highlight.position,
+              metadata: {
+                note: highlight.note || "",
+                tags: highlight.tags || [],
+                explanation: highlight.explanation || "",
+              },
+            }),
+          );
+          setHighlights(backendHighlights);
+        }
+      } catch (error: any) {
+        if (error.name !== "AbortError") {
+          console.error("Failed to load existing highlights:", error);
+        }
+      }
+    };
+
+    loadExistingHighlights();
+  }, [documentId]);
+
+  // Load existing threats from backend when document is available
+  useEffect(() => {
+    const loadExistingThreats = async () => {
+      if (!documentId || documentId === "test") return;
+
+      // Create new AbortController for this request
+      const controller = new AbortController();
+
+      try {
+        console.log(
+          "🔍 THREATS: Loading existing threats for document:",
+          documentId,
+        );
+        const response = await ApiClient.get(`/threats?docId=${documentId}`, {
+          signal: controller.signal,
+        });
+
+        if (response.data.success && response.data.data?.threats) {
+          const threats = response.data.data.threats;
+          console.log("✅ THREATS: Loaded existing threats:", threats);
+
+          // Convert backend threats to highlight format for display
+          const threatHighlights = threats.map((threat: any) => ({
+            id: threat.id,
+            text: threat.text,
+            color: getThreatColor(),
+            position: threat.position,
+            metadata: {
+              note: threat.explanation || "",
+              tags: [threat.severity || "medium"],
+              explanation: threat.explanation || "",
+              threatSeverity: threat.severity,
+              threatType: "detected",
+            },
+          }));
+
+          // Add to stored threats for highlighting in PDF
+          setStoredThreats(threatHighlights);
+
+          // Set threats analysis result for count display
+          setThreats({
+            pages: threats.map((threat: any) => ({
+              pageNumber: threat.page || 1,
+              threats: [threat],
+            })),
+            totalPages: numPages || 1,
+            totalThreats: threats.length,
+          });
+        } else {
+          console.log("📝 THREATS: No existing threats found");
+          setStoredThreats([]);
+          setThreats(null);
+        }
+      } catch (error: any) {
+        if (error.name !== "AbortError") {
+          console.error("Failed to load existing threats:", error);
+        }
+      }
+    };
+
+    loadExistingThreats();
+  }, [documentId]);
 
   // Intersection Observer to track visible pages
   useEffect(() => {
@@ -619,6 +765,100 @@ export const PDFProvider = ({
     }
   };
 
+  // Generate threats analysis for current document
+  const generateThreatsAnalysis = async () => {
+    if (!documentId || documentId === "test") {
+      console.log("🔍 THREATS: No document ID available for analysis");
+      return;
+    }
+
+    if (!numPages || numPages === 0) {
+      console.log("🔍 THREATS: No pages available for analysis");
+      return;
+    }
+
+    setIsAnalyzing(true);
+
+    try {
+      // Extract text from all pages using the existing PDF parsing
+      console.log("🔍 THREATS: Step 1 - Extracting text from all pages");
+      const highlightData = await extractPdfTextAsHighlights();
+
+      if (highlightData.length === 0) {
+        console.log("🔍 THREATS: No text content found in PDF");
+        return;
+      }
+
+      // Step 2: Send to backend for analysis
+      console.log(
+        "🔍 THREATS: Step 2 - Sending content to backend for analysis",
+      );
+
+      const pagesContent = highlightData.reduce((acc: any[], highlight) => {
+        const pageNumber = highlight.position.pageNumber;
+        let pageData = acc.find((p) => p.pageNumber === pageNumber);
+
+        if (!pageData) {
+          pageData = { pageNumber, content: "" };
+          acc.push(pageData);
+        }
+
+        pageData.content += highlight.text + " ";
+        return acc;
+      }, []);
+
+      const response = await ApiClient.post("/threats", {
+        documentId,
+        pagesContent,
+      });
+
+      if (!response.data.success || !response.data.data?.threats) {
+        throw new Error("Invalid response from backend");
+      }
+
+      const threats = response.data.data.threats;
+      console.log("🔍 THREATS: Backend analysis result:", threats);
+
+      // Convert backend threats to highlight format for display
+      const threatHighlights = threats.map((threat: any) => ({
+        id: threat.id,
+        text: threat.text,
+        color: getThreatColor(),
+        position: threat.position,
+        metadata: {
+          note: threat.explanation || "",
+          tags: [threat.severity || "medium"],
+          explanation: threat.explanation || "",
+          threatSeverity: threat.severity,
+          threatType: "detected",
+        },
+      }));
+
+      // Add to stored threats for highlighting in PDF
+      setStoredThreats(threatHighlights);
+
+      // Set threats analysis result for count display
+      setThreats({
+        pages: threats.map((threat: any) => ({
+          pageNumber: threat.page || 1,
+          threats: [threat],
+        })),
+        totalPages: numPages || 1,
+        totalThreats: threats.length,
+      });
+
+      console.log(
+        `✅ THREATS: Analysis complete - Found ${threats.length} threats`,
+      );
+    } catch (error) {
+      console.error("❌ THREATS: Analysis failed:", error);
+      setStoredThreats([]);
+      setThreats(null);
+    } finally {
+      setIsAnalyzing(false);
+    }
+  };
+
   // Extract PDF text content as highlight-like data structures
   const extractPdfTextAsHighlights = async (): Promise<Highlight[]> => {
     const extractedHighlights: Highlight[] = [];
@@ -949,13 +1189,28 @@ export const PDFProvider = ({
   };
 
   const removeHighlightById = useCallback(
-    (highlightId: string) => {
-      if (textLayerRef.current) {
-        removeHighlight(textLayerRef.current, highlightId);
+    async (highlightId: string) => {
+      try {
+        // Remove from backend first
+        if (documentId) {
+          await ApiClient.delete(`/highlights/${highlightId}`);
+        }
+
+        // Remove from UI
+        if (textLayerRef.current) {
+          removeHighlight(textLayerRef.current, highlightId);
+        }
+        setHighlights((prev) => prev.filter((h) => h.id !== highlightId));
+      } catch (error) {
+        console.error("Failed to delete highlight from backend:", error);
+        // Still remove from UI as fallback
+        if (textLayerRef.current) {
+          removeHighlight(textLayerRef.current, highlightId);
+        }
+        setHighlights((prev) => prev.filter((h) => h.id !== highlightId));
       }
-      setHighlights((prev) => prev.filter((h) => h.id !== highlightId));
     },
-    [textLayerRef, setHighlights],
+    [textLayerRef, setHighlights, documentId],
   );
 
   const clearAllHighlights = () => {
@@ -1491,15 +1746,42 @@ export const PDFProvider = ({
     [textLayerRef, threats, pagesRefs], // 🔧 FIX: Remove pageNumber dependency
   );
 
-  const updateHighlightById = (
+  const updateHighlightById = async (
     highlightId: string,
     newData: Partial<Highlight>,
   ) => {
-    setHighlights((prev) =>
-      prev.map((highlight) =>
-        highlight.id === highlightId ? { ...highlight, ...newData } : highlight,
-      ),
-    );
+    try {
+      // Update in backend first
+      if (documentId) {
+        const updateData: any = {};
+        if (newData.color) updateData.color = newData.color;
+        if (newData.metadata?.note !== undefined)
+          updateData.note = newData.metadata.note;
+        if (newData.metadata?.tags !== undefined)
+          updateData.tags = newData.metadata.tags;
+
+        await ApiClient.put(`/highlights/${highlightId}`, updateData);
+      }
+
+      // Update in frontend state
+      setHighlights((prev) =>
+        prev.map((highlight) =>
+          highlight.id === highlightId
+            ? { ...highlight, ...newData }
+            : highlight,
+        ),
+      );
+    } catch (error) {
+      console.error("Failed to update highlight in backend:", error);
+      // Still update in frontend as fallback
+      setHighlights((prev) =>
+        prev.map((highlight) =>
+          highlight.id === highlightId
+            ? { ...highlight, ...newData }
+            : highlight,
+        ),
+      );
+    }
   };
 
   const jumpToHighlight = useCallback(
@@ -1676,6 +1958,8 @@ export const PDFProvider = ({
     onLoadSuccess,
     toolbarPosition,
     setToolbarPosition,
+    toolbarView,
+    setToolbarView,
     goToPrevPage,
     goToNextPage,
     scrollToPage,
@@ -1718,6 +2002,7 @@ export const PDFProvider = ({
     isAnalyzing,
     setIsAnalyzing,
     analyzePdfForThreats,
+    generateThreatsAnalysis,
     jumpToThreat,
     highlightContextMenu,
     setHighlightContextMenu,

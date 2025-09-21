@@ -22,7 +22,9 @@ import {
   DEFAULT_HIGHLIGHT_COLOR,
   DEFAULT_HIGHLIGHT_COLORS,
   HighlightColor,
+  Highlight,
 } from "./highlight/types";
+import { ExplanationData, StoredExplanation } from "./explanation/types";
 import useLocalState from "@/hooks/useLocalState";
 import {
   Popover,
@@ -96,6 +98,7 @@ export default function PdfViewer({ className = "" }: { className?: string }) {
 
   const {
     pdfUrl,
+    documentId,
     numPages,
     pageNumber,
     pdfWidth,
@@ -105,6 +108,7 @@ export default function PdfViewer({ className = "" }: { className?: string }) {
     pagesRefs,
     onLoadSuccess,
     toolbarPosition,
+    toolbarView,
     setHighlights,
     applyHighlightsToTextLayer,
     highlightContextMenu,
@@ -256,7 +260,21 @@ export default function PdfViewer({ className = "" }: { className?: string }) {
     startExplaining(async () => {
       if (!selection?.selectedText || isExplaining) return;
 
+      if (!documentId) {
+        console.error("❌ No documentId available for explanation");
+        toast.error("Document ID is missing", {
+          description: "Cannot explain text without document context.",
+        });
+        return;
+      }
+
       try {
+        console.log("🔍 Starting explanation for:", {
+          selectedText: selection.selectedText,
+          documentId,
+          pageNumber,
+        });
+
         // Extract context text from PDF
         const context = await extractContextText(pdfUrl, pageNumber);
 
@@ -267,61 +285,58 @@ export default function PdfViewer({ className = "" }: { className?: string }) {
           prevPageText: context.prevPageText,
           nextPageText: context.nextPageText,
           page: pageNumber,
+          documentId,
         };
 
-        const response = await ApiClient.post("/explain/text", payload);
+        const response = await ApiClient.post("/explanations/text", payload);
 
         if (response.data.success) {
           const explanationData: ExplanationData = response.data.data;
           console.log("Explanation received:", explanationData);
           setExplanation(explanationData);
 
-          // Saving to localStorage
+          // Add to frontend state in the format expected by the explanations list
+          // Backend saves it automatically, but we need to update UI immediately
           if (selection) {
-            // Get the current page element to ensure we're storing page-relative information
+            // Calculate position offsets like the original code
             const currentPageElement = pagesRefs.current?.get(pageNumber);
-            let pageTextContent = "";
-            let startOffset = -1;
+            let startOffset = 0;
+            let endOffset = selection.selectedText.length;
 
             if (currentPageElement) {
               const pageTextLayer = currentPageElement.querySelector(
                 ".react-pdf__Page__textContent",
               );
               if (pageTextLayer) {
-                pageTextContent = pageTextLayer.textContent || "";
-                startOffset = pageTextContent.indexOf(selection.selectedText);
-                /* debug logs*/
-                console.log("Saving explanation for page:", pageNumber);
-                console.log("Page text length:", pageTextContent.length);
-                console.log("Selected text:", `"${selection.selectedText}"`);
-                console.log("Found at page offset:", startOffset);
+                const pageTextContent = pageTextLayer.textContent || "";
+                const foundOffset = pageTextContent.indexOf(
+                  selection.selectedText,
+                );
+                if (foundOffset !== -1) {
+                  startOffset = foundOffset;
+                  endOffset = foundOffset + selection.selectedText.length;
+                }
               }
             }
 
-            // Only save if we found the text on the current page....will work on this later DW
-            if (startOffset !== -1) {
-              const endOffset = startOffset + selection.selectedText.length;
-
-              const storedExplanation: StoredExplanation = {
-                id: `exp-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
-                selectedText: selection.selectedText,
-                explanation: explanationData,
-                position: {
-                  startOffset,
-                  endOffset,
-                  pageNumber,
-                },
-                createdAt: new Date().toISOString(),
+            const storedExplanation: StoredExplanation = {
+              id: `exp-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+              selectedText: selection.selectedText,
+              explanation: explanationData,
+              position: {
+                startOffset,
+                endOffset,
                 pageNumber,
-              };
+              },
+              createdAt: new Date().toISOString(),
+              pageNumber,
+            };
 
-              setStoredExplanations((prev) => [...prev, storedExplanation]);
-              console.log("Saved explanation successfully:", storedExplanation);
-            } else {
-              console.warn(
-                "Could not find selected text on current page, not saving explanation",
-              );
-            }
+            setStoredExplanations((prev) => [...prev, storedExplanation]);
+            console.log(
+              "Added explanation to frontend state:",
+              storedExplanation,
+            );
           }
 
           toast.success("Explanation complete!");
@@ -332,6 +347,25 @@ export default function PdfViewer({ className = "" }: { className?: string }) {
         }
       } catch (error: unknown) {
         console.error("Error explaining text:", error);
+
+        // Log the complete error for debugging
+        if (
+          typeof error === "object" &&
+          error !== null &&
+          "response" in error
+        ) {
+          const axiosError = error as any;
+          console.error("Full API error response:", {
+            status: axiosError.response?.status,
+            data: axiosError.response?.data,
+            message: axiosError.message,
+            requestData: {
+              selectionText: selection?.selectedText,
+              documentId,
+              page: pageNumber,
+            },
+          });
+        }
 
         //type gurading shit (dont mind)
         const isAxiosError = (
@@ -424,8 +458,12 @@ export default function PdfViewer({ className = "" }: { className?: string }) {
    * @param {HighlightColor} color - The color to use for the highlight
    */
   const highlightSelectedText = useCallback(
-    (color: HighlightColor = currentHighlightColor) => {
-      if (selection?.selectedText.trim() && textLayerRef.current) {
+    async (color: HighlightColor = currentHighlightColor) => {
+      if (
+        selection?.selectedText.trim() &&
+        textLayerRef.current &&
+        documentId
+      ) {
         setCurrentHighlightColor(color);
 
         const highlight = createHighlightFromSelection(
@@ -434,12 +472,52 @@ export default function PdfViewer({ className = "" }: { className?: string }) {
           { color },
         );
         if (highlight) {
-          setHighlights((prev) => [...prev, highlight]);
+          try {
+            // Save to backend first
+            const highlightData = {
+              documentId,
+              pageNumber: highlight.position.pageNumber,
+              position: highlight.position,
+              text: highlight.text,
+              color: highlight.color,
+              note: highlight.metadata?.note || "",
+              explanation: "", // No explanation in simple highlights
+              tags: highlight.metadata?.tags || [],
+            };
+
+            const response = await ApiClient.post("/highlights", highlightData);
+
+            if (response.data.success) {
+              // Update the highlight with the backend ID
+              const savedHighlight = {
+                ...highlight,
+                id: response.data.data.id,
+              };
+              setHighlights((prev) => [...prev, savedHighlight]);
+            } else {
+              throw new Error(
+                response.data.error?.message || "Failed to save highlight",
+              );
+            }
+          } catch (error) {
+            console.error("Failed to save highlight to backend:", error);
+            // Still add to local state as fallback
+            setHighlights((prev) => [...prev, highlight]);
+          }
         }
         clearSelection();
       }
     },
-    [selection, textLayerRef, pageNumber, currentHighlightColor],
+    [
+      selection,
+      textLayerRef,
+      pageNumber,
+      currentHighlightColor,
+      documentId,
+      clearSelection,
+      setCurrentHighlightColor,
+      setHighlights,
+    ],
   );
 
   // Set up event listeners
@@ -489,14 +567,26 @@ export default function PdfViewer({ className = "" }: { className?: string }) {
   return (
     <div
       ref={textLayerRef}
-      className={`pdf-container bg-background relative flex h-screen w-full flex-1 flex-col justify-start overflow-scroll p-4 ${className}`}
+      className={cn(
+        "pdf-container bg-background relative flex w-full flex-col justify-start overflow-scroll p-4",
+        // For floating toolbar, full height
+        toolbarView === "floating" && "h-screen flex-1",
+        // For fixed toolbar, let it flex grow
+        toolbarView === "fixed" && "flex-1",
+        className,
+      )}
     >
       <Document
         file={pdfUrl}
         onLoadSuccess={onLoadSuccess}
         className={cn(
           "flex flex-col",
-          toolbarPosition === "top" ? "pt-10" : "pb-10",
+          // For floating toolbar, add padding to avoid overlap
+          toolbarView === "floating" && [
+            toolbarPosition === "top" ? "pt-10" : "pb-10",
+          ],
+          // For fixed toolbar, no extra padding needed as it's in the layout flow
+          toolbarView === "fixed" && "p-0",
         )}
         rotate={rotation}
         scale={zoomLevel}

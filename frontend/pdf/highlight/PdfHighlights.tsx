@@ -59,8 +59,8 @@ export default function PdfHighlights() {
         ?.toLowerCase()
         .includes(searchQuery.toLowerCase()) ||
       highlight.metadata.tags?.some((tag) =>
-        tag.toLowerCase().includes(searchQuery.toLowerCase())
-      )
+        tag.toLowerCase().includes(searchQuery.toLowerCase()),
+      ),
   );
 
   // ========================================
@@ -81,13 +81,16 @@ export default function PdfHighlights() {
    * @param {string} highlightId - The ID of the highlight to update
    */
   const handleSaveNote = (highlightId: string) => {
-    updateHighlightById(highlightId, {
-      metadata: {
-        ...highlights.find((h) => h.id === highlightId)?.metadata!,
-        note: noteText.trim() || undefined,
-        updatedAt: new Date().toISOString(),
-      },
-    });
+    const existingHighlight = highlights.find((h) => h.id === highlightId);
+    if (existingHighlight?.metadata) {
+      updateHighlightById(highlightId, {
+        metadata: {
+          ...existingHighlight.metadata,
+          note: noteText.trim() || undefined,
+          updatedAt: new Date().toISOString(),
+        },
+      });
+    }
     setEditingNote(null);
     setNoteText("");
   };
@@ -120,9 +123,9 @@ export default function PdfHighlights() {
    * Renders the search input and clear all button
    */
   const renderSearchSection = () => (
-    <div className="flex flex-col gap-4 p-4 shrink-0">
+    <div className="flex shrink-0 flex-col gap-4 p-4">
       <div className="relative">
-        <SearchIcon className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+        <SearchIcon className="text-muted-foreground absolute top-3 left-3 h-4 w-4" />
         <Input
           placeholder="Search highlights..."
           value={searchQuery}
@@ -176,8 +179,8 @@ export default function PdfHighlights() {
    */
   const renderExistingNote = (highlight: Highlight) =>
     highlight.metadata.note && (
-      <div className="flex items-start gap-2 text-sm text-muted-foreground">
-        <StickyNoteIcon className="h-4 w-4 mt-0.5 flex-shrink-0" />
+      <div className="text-muted-foreground flex items-start gap-2 text-sm">
+        <StickyNoteIcon className="mt-0.5 h-4 w-4 flex-shrink-0" />
         <span className="flex-1">{highlight.metadata.note}</span>
       </div>
     );
@@ -192,10 +195,10 @@ export default function PdfHighlights() {
         <button
           key={color.id}
           className={cn(
-            "w-4 h-4 rounded border transition-all hover:scale-110",
+            "h-4 w-4 rounded border transition-all hover:scale-110",
             highlight.color.id === color.id
               ? "border-foreground border-2"
-              : "border-border"
+              : "border-border",
           )}
           style={{ backgroundColor: color.backgroundColor }}
           onClick={() => handleChangeColor(highlight.id, color.id)}
@@ -225,7 +228,7 @@ export default function PdfHighlights() {
         variant="ghost"
         size="sm"
         onClick={() => removeHighlightById(highlight.id)}
-        className="h-6 w-6 p-0 text-destructive hover:text-destructive"
+        className="text-destructive hover:text-destructive h-6 w-6 p-0"
         title="Delete highlight"
       >
         <TrashIcon className="h-3 w-3" />
@@ -238,12 +241,12 @@ export default function PdfHighlights() {
   // ========================================
 
   return (
-    <div className="flex flex-col h-full w-full max-w-sm">
+    <div className="flex h-full w-full max-w-sm flex-col">
       {/* Search Section */}
       {renderSearchSection()}
 
       {/* Highlights List */}
-      <div className="flex-1 px-4 overflow-y-auto min-h-0">
+      <div className="min-h-0 flex-1 overflow-y-auto px-4">
         <div className="space-y-3">
           <AnimatePresence>
             {filteredHighlights.map((highlight) => (
@@ -252,11 +255,11 @@ export default function PdfHighlights() {
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -20 }}
-                className="border border-border rounded-lg p-3 space-y-2 hover:bg-muted/50 transition-colors"
+                className="border-border hover:bg-muted/50 space-y-2 rounded-lg border p-3 transition-colors"
               >
                 {/* Highlight Text */}
                 <div
-                  className="text-sm leading-relaxed cursor-pointer"
+                  className="cursor-pointer text-sm leading-relaxed"
                   style={{
                     backgroundColor: `${highlight.color.backgroundColor}20`,
                     borderLeft: `3px solid ${highlight.color.backgroundColor}`,
@@ -276,8 +279,8 @@ export default function PdfHighlights() {
                 {/* Tags Section */}
                 {highlight.metadata.tags &&
                   highlight.metadata.tags.length > 0 && (
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <TagIcon className="h-3 w-3 text-muted-foreground" />
+                    <div className="flex flex-wrap items-center gap-2">
+                      <TagIcon className="text-muted-foreground h-3 w-3" />
                       {highlight.metadata.tags.map((tag) => (
                         <Badge
                           key={tag}
@@ -291,11 +294,11 @@ export default function PdfHighlights() {
                   )}
 
                 {/* Metadata Section */}
-                <div className="flex items-center justify-between text-xs text-muted-foreground">
+                <div className="text-muted-foreground flex items-center justify-between text-xs">
                   <span>
                     Page {highlight.position.pageNumber} •{" "}
                     {new Date(
-                      highlight.metadata.createdAt
+                      highlight.metadata.createdAt,
                     ).toLocaleDateString()}
                   </span>
                 </div>
@@ -316,7 +319,7 @@ export default function PdfHighlights() {
 
           {/* Empty State */}
           {filteredHighlights.length === 0 && (
-            <div className="text-center py-8 text-muted-foreground">
+            <div className="text-muted-foreground py-8 text-center">
               {searchQuery ? "No highlights found" : "No highlights yet"}
             </div>
           )}

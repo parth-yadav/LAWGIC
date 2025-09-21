@@ -17,7 +17,6 @@ import {
 } from "lucide-react";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
-import { Label } from "../ui/label";
 import {
   Form,
   FormControl,
@@ -34,6 +33,7 @@ import { useState, useRef, useCallback } from "react";
 import ApiClient from "@/utils/ApiClient";
 import { toast } from "sonner";
 import { pdfjs } from "react-pdf";
+import { AnimatePresence, motion } from "motion/react";
 
 // Set up PDF.js worker
 pdfjs.GlobalWorkerOptions.workerSrc = new URL(
@@ -62,7 +62,13 @@ const documentSchema = z.object({
 
 type DocumentFormData = z.infer<typeof documentSchema>;
 
-export default function AddDocument({ onAdd }: { onAdd?: () => void }) {
+export default function AddDocument({
+  onAdd,
+  expanded,
+}: {
+  onAdd?: (docId?: string) => void;
+  expanded?: boolean;
+}) {
   const [open, setOpen] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const [isDragOver, setIsDragOver] = useState(false);
@@ -225,7 +231,8 @@ export default function AddDocument({ onAdd }: { onAdd?: () => void }) {
         form.reset();
         setPdfInfo(null);
         setOpen(false);
-        if (onAdd) onAdd();
+        const newDocId = response.data.data.id;
+        if (onAdd) onAdd(newDocId);
       } else {
         toast.error("Failed to save document", {
           description: response.data.error?.message || "Unknown error occurred",
@@ -252,9 +259,23 @@ export default function AddDocument({ onAdd }: { onAdd?: () => void }) {
   return (
     <Sheet open={open} onOpenChange={handleOpenChange}>
       <SheetTrigger asChild>
-        <Button>
-          <UploadIcon className="mr-2 h-4 w-4" />
-          Add Document
+        <Button className="group relative w-full justify-start">
+          <UploadIcon />
+          <AnimatePresence>
+            {expanded === true || expanded === undefined ? (
+              <motion.span
+                initial={{ opacity: 0, width: 0 }}
+                animate={{ opacity: 1, width: "auto" }}
+                exit={{ opacity: 0, width: 0 }}
+              >
+                Add Document
+              </motion.span>
+            ) : (
+              <span className="bg-primary text-primary-foreground absolute left-full z-50 max-w-0 origin-left scale-x-0 transform overflow-hidden rounded-lg px-2 py-0.5 font-light opacity-0 transition-all duration-150 ease-in-out group-hover:max-w-xs group-hover:scale-x-100 group-hover:opacity-100">
+                Add Document
+              </span>
+            )}
+          </AnimatePresence>
         </Button>
       </SheetTrigger>
       <SheetContent className="sm:max-w-md">

@@ -12,7 +12,7 @@ import {
   ScanIcon,
   DownloadIcon,
 } from "lucide-react";
-import { THREAT_COLORS, HighlightColor, Highlight } from "./types";
+import { THREAT_COLORS, Highlight, HighlightColor } from "./types";
 import { cn } from "@/lib/utils";
 import { motion, AnimatePresence } from "framer-motion";
 import { usePDF } from "../PdfProvider";
@@ -45,11 +45,13 @@ export default function PdfThreats() {
     jumpToHighlight,
     setStoredThreats,
     addThreatToStorage,
+    threats,
+    isAnalyzing,
+    generateThreatsAnalysis,
   } = usePDF();
 
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedSeverity, setSelectedSeverity] = useState<string | null>(null);
-  const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [analysisProgress, setAnalysisProgress] = useState({
     current: 0,
     total: 0,
@@ -64,50 +66,36 @@ export default function PdfThreats() {
   // EFFECTS
   // ========================================
 
-  // Load existing threats from backend when component mounts
+  // Sync provider threats data with local state
   useEffect(() => {
-    const loadExistingThreats = async () => {
-      if (!documentId || documentId === "test") {
-        setIsLoading(false);
-        return;
-      }
+    if (threats && threats.totalThreats > 0) {
+      // Provider has threats data, sync with local state
+      setThreatsExist(true);
+      setIsLoading(false);
 
-      try {
-        console.log(
-          "🔍 THREATS: Loading existing threats for document:",
-          documentId,
-        );
-        const response = await ApiClient.get(`/threats?docId=${documentId}`);
+      // Convert threat analysis result to local format if needed
+      const threatList = threats.pages.flatMap((page) =>
+        page.threats.map((threat: any) => ({
+          ...threat,
+          page: page.page,
+        })),
+      );
 
-        if (response.data.success && response.data.data?.threats) {
-          const threats = response.data.data.threats;
-          console.log("✅ THREATS: Loaded existing threats:", threats);
+      setBackendThreats(threatList);
 
-          setBackendThreats(threats);
-          setThreatsExist(true);
-
-          // Convert backend threats to highlight format for display
-          const highlights = threats.map((threat: any) =>
-            convertBackendThreatToHighlight(threat),
-          );
-          setThreatHighlights(highlights);
-
-          // Also add to PDFProvider's stored threats for highlighting in PDF
-          setStoredThreats(highlights);
-        } else {
-          console.log("📝 THREATS: No existing threats found");
-          setThreatsExist(false);
-        }
-      } catch (error) {
-        console.log("⚠️ THREATS: Error loading existing threats:", error);
-        setThreatsExist(false);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    loadExistingThreats();
-  }, [documentId]);
+      // Convert to highlight format for display
+      const highlights = threatList.map((threat: any) =>
+        convertBackendThreatToHighlight(threat),
+      );
+      setThreatHighlights(highlights);
+    } else {
+      // No threats from provider
+      setThreatsExist(false);
+      setIsLoading(false);
+      setBackendThreats([]);
+      setThreatHighlights([]);
+    }
+  }, [threats]);
 
   // ========================================
   // HELPER FUNCTIONS
@@ -606,10 +594,10 @@ export default function PdfThreats() {
   };
 
   /**
-   * Main threat analysis function
+   * Main threat analysis function - now uses provider functionality
    */
   const handleAnalyzePdf = async () => {
-    console.log("🔍 THREATS: Starting PDF threat analysis");
+    console.log("🔍 THREATS: Starting PDF threat analysis via provider");
 
     if (!documentId || documentId === "test") {
       console.log("🔍 THREATS: No document ID available for analysis");
@@ -621,61 +609,11 @@ export default function PdfThreats() {
       return;
     }
 
-    setIsAnalyzing(true);
-    setAnalysisProgress({ current: 0, total: numPages });
+    // Use provider's threat generation functionality
+    await generateThreatsAnalysis();
 
-    try {
-      // Step 1: Extract text from all pages
-      console.log("🔍 THREATS: Step 1 - Extracting text from all pages");
-      const pagesContent = extractAllPagesText();
-
-      if (pagesContent.length === 0) {
-        console.log("🔍 THREATS: No text content found in PDF");
-        setIsAnalyzing(false);
-        return;
-      }
-
-      // Step 2: Send to backend for analysis
-      console.log(
-        "🔍 THREATS: Step 2 - Sending content to backend for analysis",
-      );
-      console.log("🚀 THREATS: EXACT DATA being sent to backend:");
-      console.log(JSON.stringify({ documentId, pagesContent }, null, 2));
-
-      const response = await ApiClient.post("/threats", {
-        documentId,
-        pagesContent,
-      });
-
-      if (!response.data.success || !response.data.data?.threats) {
-        throw new Error("Invalid response from backend");
-      }
-
-      const threats = response.data.data.threats;
-      console.log("🔍 THREATS: Backend analysis result:", threats);
-
-      // Step 3: Update state with new threats
-      setBackendThreats(threats);
-      setThreatsExist(true);
-
-      // Convert to highlight format for display
-      const highlights = threats.map((threat: any) =>
-        convertBackendThreatToHighlight(threat),
-      );
-      setThreatHighlights(highlights);
-
-      // Also add to PDFProvider's stored threats for highlighting in PDF
-      setStoredThreats(highlights);
-
-      console.log(
-        `✅ THREATS: Analysis complete - Found ${threats.length} threats`,
-      );
-    } catch (error) {
-      console.error("❌ THREATS: Analysis failed:", error);
-    } finally {
-      setIsAnalyzing(false);
-      setAnalysisProgress({ current: 0, total: 0 });
-    }
+    // The provider will automatically update the threats state, which will
+    // trigger our useEffect to sync the local state
   };
 
   /**

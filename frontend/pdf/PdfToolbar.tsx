@@ -22,14 +22,15 @@ import {
   DropdownMenuGroup,
   DropdownMenuItem,
   DropdownMenuLabel,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { TbZoomReset } from "react-icons/tb";
 import ThemeSwitch from "@/components/ThemeSwitch";
 import { motion, AnimatePresence } from "framer-motion";
-import { Separator } from "@/components/ui/separator";
 import { cn } from "@/lib/utils";
 import { RiExpandWidthFill } from "react-icons/ri";
+import { Separator } from "@/components/ui/separator";
 
 export default function PdfToolbar({ className = "" }: { className?: string }) {
   const {
@@ -57,6 +58,8 @@ export default function PdfToolbar({ className = "" }: { className?: string }) {
     storedExplanations,
     toggleThreatsTab,
     threats,
+    toolbarView,
+    setToolbarView,
   } = usePDF();
 
   const handlePageSubmit = (value: string) => {
@@ -71,14 +74,42 @@ export default function PdfToolbar({ className = "" }: { className?: string }) {
   return (
     <div
       className={cn(
-        "fixed left-1/2 transform -translate-x-1/2 z-50",
-        "transition-all duration-300",
-        toolbarPosition === "top" ? "top-6" : "bottom-6",
-        className
+        "z-50 max-w-full overflow-auto transition-all duration-300",
+        // View-based positioning
+        toolbarView === "floating" && [
+          "absolute left-1/2 -translate-x-1/2 transform",
+          toolbarPosition === "top" ? "top-6" : "bottom-6",
+        ],
+        toolbarView === "fixed" && [
+          "relative w-full",
+          toolbarPosition === "top" ? "order-1" : "order-2",
+        ],
+        className,
       )}
     >
-      <div className="flex items-center gap-6 px-3 py-1.5 bg-card backdrop-blur-sm text-card-foreground border border-border rounded-full shadow-lg">
-        <div className="flex items-center gap-2">
+      <div
+        className={cn(
+          "bg-card text-card-foreground border-border flex items-center px-3 py-1.5",
+          // Shape and spacing based on view
+          toolbarView === "floating" && [
+            "rounded-full border shadow-lg backdrop-blur-sm",
+            "mx-auto max-w-fit", // Center the floating toolbar
+            "flex-wrap gap-2 sm:flex-nowrap sm:gap-4", // Responsive wrapping
+          ],
+          toolbarView === "fixed" && [
+            "w-full border-y shadow-sm",
+            "justify-between px-4 py-2", // More padding for fixed mode
+            "flex-wrap gap-2 sm:flex-nowrap", // Responsive wrapping
+          ],
+        )}
+      >
+        {/* Left Section - Navigation */}
+        <div
+          className={cn(
+            "flex items-center",
+            toolbarView === "floating" ? "gap-2" : "gap-3",
+          )}
+        >
           <Button
             variant="outline"
             size="icon"
@@ -94,7 +125,7 @@ export default function PdfToolbar({ className = "" }: { className?: string }) {
             onSubmit={handlePageSubmit}
             className="min-w-[2rem] text-center font-mono text-sm"
           />
-          <span className="text-sm text-muted-foreground">
+          <span className="text-muted-foreground text-sm">
             /&nbsp;{numPages ?? "..."}
           </span>
 
@@ -109,7 +140,14 @@ export default function PdfToolbar({ className = "" }: { className?: string }) {
           </Button>
         </div>
 
-        <div className="flex items-center gap-2">
+        {/* Center Section - Zoom Controls */}
+        <div
+          className={cn(
+            "flex items-center",
+            toolbarView === "floating" ? "gap-2" : "gap-3",
+            "order-2 sm:order-none", // Move to second row on mobile
+          )}
+        >
           <Button
             variant="outline"
             size="icon"
@@ -141,7 +179,7 @@ export default function PdfToolbar({ className = "" }: { className?: string }) {
             size="icon"
             onClick={resetZoom}
             disabled={zoomLevel === 1}
-            className="h-8 w-8 rounded-full"
+            className="hidden h-8 w-8 rounded-full sm:flex" // Hide on mobile
           >
             <TbZoomReset className="h-4 w-4" />
           </Button>
@@ -150,18 +188,24 @@ export default function PdfToolbar({ className = "" }: { className?: string }) {
             variant="outline"
             size="icon"
             onClick={setZoomToFit}
-            className="h-8 w-8 rounded-full"
+            className="hidden h-8 w-8 rounded-full sm:flex" // Hide on mobile
           >
             <RiExpandWidthFill className="h-4 w-4" />
           </Button>
         </div>
 
-        <div className="flex items-center gap-2">
+        {/* Actions Section - Tools */}
+        <div
+          className={cn(
+            "flex items-center",
+            toolbarView === "floating" ? "gap-2" : "gap-3",
+          )}
+        >
           <Button
             variant="outline"
             size="icon"
             onClick={rotateClockwise}
-            className="h-8 w-8 rounded-full"
+            className="hidden h-8 w-8 rounded-full sm:flex" // Hide on mobile
           >
             <RotateCwIcon className="h-4 w-4" />
           </Button>
@@ -170,46 +214,46 @@ export default function PdfToolbar({ className = "" }: { className?: string }) {
             variant="outline"
             size="icon"
             onClick={toggleHighlightsTab}
-            className="h-8 w-8 rounded-full relative"
+            className="relative h-8 w-8 rounded-full"
           >
             <HighlighterIcon className="h-4 w-4" />
-            {highlights.length > 0 && (
-              <span className="absolute -top-1 -right-1 bg-primary text-primary-foreground text-xs font-bold rounded-full px-1">
-                {highlights.length}
-              </span>
-            )}
+            <span className="bg-primary text-primary-foreground absolute -top-1 -right-1 flex h-4 min-w-[16px] items-center justify-center rounded-full px-1 text-xs font-bold">
+              {highlights.length}
+            </span>
           </Button>
 
           <Button
             variant="outline"
             size="icon"
             onClick={toggleExplanationsTab}
-            className="h-8 w-8 rounded-full relative"
+            className="relative h-8 w-8 rounded-full"
           >
             <MessageSquareIcon className="h-4 w-4" />
-            {storedExplanations.length > 0 && (
-              <span className="absolute -top-1 -right-1 bg-primary text-primary-foreground text-xs font-bold rounded-full px-1">
-                {storedExplanations.length}
-              </span>
-            )}
+            <span className="bg-primary text-primary-foreground absolute -top-1 -right-1 flex h-4 min-w-[16px] items-center justify-center rounded-full px-1 text-xs font-bold">
+              {storedExplanations.length}
+            </span>
           </Button>
 
           <Button
             variant="outline"
             size="icon"
             onClick={toggleThreatsTab}
-            className="h-8 w-8 rounded-full relative"
+            className="relative h-8 w-8 rounded-full"
           >
             <ShieldAlertIcon className="h-4 w-4" />
-            {threats && threats.totalThreats > 0 && (
-              <span className="absolute -top-1 -right-1 bg-red-600 text-white text-xs font-bold rounded-full px-1">
-                {threats.totalThreats}
-              </span>
-            )}
+            <span className="absolute -top-1 -right-1 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-red-600 px-1 text-xs font-bold text-white">
+              {threats?.totalThreats || 0}
+            </span>
           </Button>
         </div>
 
-        <div className="flex items-center gap-2">
+        {/* Right Section - Settings */}
+        <div
+          className={cn(
+            "flex items-center",
+            toolbarView === "floating" ? "gap-2" : "gap-3",
+          )}
+        >
           <AnimatePresence>
             {pageNumber > 1 && (
               <motion.div
@@ -261,6 +305,27 @@ export default function PdfToolbar({ className = "" }: { className?: string }) {
                     }
                   />
                   Bottom
+                </DropdownMenuItem>
+              </DropdownMenuGroup>
+              <DropdownMenuSeparator />
+              <DropdownMenuGroup>
+                <DropdownMenuLabel>Toolbar View</DropdownMenuLabel>
+                <Separator className="mb-2" />
+                <DropdownMenuItem onClick={() => setToolbarView("floating")}>
+                  <CheckIcon
+                    className={
+                      toolbarView === "floating" ? "opacity-100" : "opacity-0"
+                    }
+                  />
+                  Floating
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setToolbarView("fixed")}>
+                  <CheckIcon
+                    className={
+                      toolbarView === "fixed" ? "opacity-100" : "opacity-0"
+                    }
+                  />
+                  Fixed
                 </DropdownMenuItem>
               </DropdownMenuGroup>
             </DropdownMenuContent>

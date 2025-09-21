@@ -9,9 +9,6 @@ import { useEffect, useState } from "react";
 export default function Page() {
   const params = useParams<{ documentId: string }>();
 
-  if (params.documentId === "test") {
-    return <PDF pdfUrl={"/pdfs/sample.pdf"} className="flex-1" />;
-  }
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const [pdfUrl, setPdfUrl] = useState<string | null>(null);

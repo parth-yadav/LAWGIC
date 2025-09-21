@@ -7,6 +7,7 @@ import validateEnv from "./utils/validateEnv";
 import explainRouter from "./routes/explain.routes";
 import documentRouter from "./routes/document.routes";
 import threatRouter from "./routes/threat.routes";
+import highlightRouter from "./routes/highlight.routes";
 
 dotenv.config();
 
@@ -36,6 +37,7 @@ app.use("/auth", authRouter);
 app.use("/documents", documentRouter);
 app.use("/explanations", explainRouter);
 app.use("/threats", threatRouter);
+app.use("/highlights", highlightRouter);
 
 validateEnv()
   .then(() => {

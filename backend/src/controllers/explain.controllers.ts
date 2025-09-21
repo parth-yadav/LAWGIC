@@ -52,6 +52,15 @@ const makeRequestWithRetry = async (
 
 export const explainText = async (req: Request, res: Response) => {
   try {
+    console.log("🔍 EXPLAIN TEXT REQUEST:", {
+      body: req.body,
+      userId: req.user?.id,
+      headers: {
+        authorization: req.headers.authorization ? "Bearer [token]" : "Missing",
+        "content-type": req.headers["content-type"],
+      },
+    });
+
     const {
       selectionText,
       currentPageText,
@@ -66,7 +75,20 @@ export const explainText = async (req: Request, res: Response) => {
 
     const userId = req.user?.id;
 
+    if (!userId) {
+      console.error("❌ Missing user ID from auth middleware");
+      return sendResponse({
+        res,
+        success: false,
+        error: {
+          message: "Authentication required",
+        },
+        statusCode: 401,
+      });
+    }
+
     if (!selectionText?.trim()) {
+      console.error("❌ Missing selection text:", { selectionText });
       return sendResponse({
         res,
         success: false,
@@ -78,6 +100,7 @@ export const explainText = async (req: Request, res: Response) => {
     }
 
     if (!documentId) {
+      console.error("❌ Missing document ID:", { documentId });
       return sendResponse({
         res,
         success: false,
@@ -89,6 +112,7 @@ export const explainText = async (req: Request, res: Response) => {
     }
 
     // Verify user owns the document
+    console.log("🔍 Checking document ownership:", { documentId, userId });
     const document = await prisma.document.findFirst({
       where: {
         id: documentId,
@@ -98,6 +122,13 @@ export const explainText = async (req: Request, res: Response) => {
     });
 
     if (!document) {
+      console.error("❌ Document not found or access denied:", {
+        documentId,
+        userId,
+        documentExists: await prisma.document.findFirst({
+          where: { id: documentId },
+        }),
+      });
       return sendResponse({
         res,
         success: false,
@@ -107,6 +138,8 @@ export const explainText = async (req: Request, res: Response) => {
         statusCode: 404,
       });
     }
+
+    console.log("✅ Document access verified:", document.title);
 
     // Check if explanation already exists for this exact text and document
     const existingExplanation = await prisma.explanation.findFirst({
@@ -217,7 +250,13 @@ export const explainText = async (req: Request, res: Response) => {
         : "Text explained successfully",
     });
   } catch (error: any) {
-    console.error("Error explaining text:", error);
+    console.error("❌ Error explaining text:", {
+      error: error.message || error,
+      stack: error.stack,
+      userId: req.user?.id,
+      documentId: req.body?.documentId,
+      selectionText: req.body?.selectionText,
+    });
 
     let errorMessage = "Failed to explain text";
     let statusCode = 500;

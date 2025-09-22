@@ -36,19 +36,37 @@ export function generateThreatsPDF(
 
     // table data
     const severityOrder = { critical: 0, high: 1, medium: 2, low: 3 };
+
     const threats: ThreatPDFData[] = threatHighlights
-        .map((h, i) => {
+        .map((h) => {
             const severity =
                 h.metadata.tags?.find(tag =>
                     ['critical', 'high', 'medium', 'low'].includes(tag.toLowerCase())
                 ) || 'high';
+            
+
+            let pageNumber = 1; // Default fallback
+        
+            if (h.position?.pageNumber) {
+                pageNumber = h.position.pageNumber;
+            }
+            else if (h.metadata && 'page' in h.metadata) {
+                pageNumber = (h.metadata as any).page;
+            }
+            else {
+                console.warn('No page number found for threat, using default page 1');
+                pageNumber = 1;
+            }
+
+            const createdAt = h.metadata?.createdAt || new Date().toISOString();
+            
             return {
-                id: i + 1,
+                id: 0, 
                 severity,
-                pageNumber: h.position.pageNumber,
-                text: h.text || '',
-                explanation: h.metadata.note || 'No explanation provided',
-                createdAt: h.metadata.createdAt,
+                pageNumber,
+                text: h.text || 'No text available',
+                explanation: h.metadata?.note || 'No explanation provided',
+                createdAt,
             };
         })
         .sort((a, b) => {
@@ -56,18 +74,29 @@ export function generateThreatsPDF(
                 (severityOrder[a.severity as keyof typeof severityOrder] ?? 3) -
                 (severityOrder[b.severity as keyof typeof severityOrder] ?? 3);
             return sDiff !== 0 ? sDiff : a.pageNumber - b.pageNumber;
-        });
+        })
+        .map((threat, index) => ({
+            ...threat,
+            id: index + 1,
+        }));
 
     const head = [
         ['#', 'Severity', 'Page', 'Detected Text', 'Analysis', 'Detected At'],
     ];
+    
     const body = threats.map(t => [
         t.id.toString(),
         t.severity.toUpperCase(),
         t.pageNumber.toString(),
         t.text,
         t.explanation,
-        new Date(t.createdAt).toLocaleString(),
+        (() => {
+            try {
+                return new Date(t.createdAt).toLocaleString();
+            } catch {
+                return 'Unknown';
+            }
+        })(),
     ]);
 
     // Table
@@ -99,7 +128,6 @@ export function generateThreatsPDF(
         didDrawPage: (data) => {
             // Footer 
             doc.setFillColor(229, 224, 220);
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             const pageCount = (doc as any).getNumberOfPages();
             const footer = `Page ${data.pageNumber} of ${pageCount}`;
             doc.setFontSize(8);
@@ -112,7 +140,7 @@ export function generateThreatsPDF(
         },
     });
 
-    
+    // Save the PDF
     const timestamp = new Date().toISOString().split('T')[0];
     const sanitizedName = documentName.replace(/[^a-zA-Z0-9]/g, '-').substring(0, 30);
     const filename = `security-analysis-${sanitizedName}-${timestamp}.pdf`;

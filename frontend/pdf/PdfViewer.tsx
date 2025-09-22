@@ -433,6 +433,7 @@ export default function PdfViewer({ className = "" }: { className?: string }) {
     isExplaining,
     setStoredExplanations,
     pagesRefs,
+    documentId
   ]);
 
   /**

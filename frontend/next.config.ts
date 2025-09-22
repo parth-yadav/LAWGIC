@@ -15,6 +15,11 @@ const nextConfig: NextConfig = {
         protocol: "https",
         hostname: `lawgic-backend-684404792129.asia-south2.run.app`,
       },
+      {
+        protocol: "http",
+        hostname: `localhost`,
+        port: "6900",
+      },
     ],
   },
 };

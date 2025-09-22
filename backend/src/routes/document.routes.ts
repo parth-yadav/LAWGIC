@@ -12,10 +12,10 @@ import { uploadDocumentWithThumbnail } from "../middlewares/upload.js";
 
 const router = Router();
 
-router.use(validToken);
-
+// Apply validToken middleware to all routes except /:id/thumbnail
 router.post(
   "/",
+  validToken,
   (req, res, next) => {
     uploadDocumentWithThumbnail(req, res, (err: any) => {
       if (err) {
@@ -31,10 +31,10 @@ router.post(
   createDocument
 );
 
-router.get("/", getUserDocuments);
-router.get("/:id", getDocumentById);
-router.get("/:id/thumbnail", getDocumentThumbnail);
-router.post("/:id/rename", renameDocumentById);
-router.delete("/:id", deleteDocument);
+router.get("/", validToken, getUserDocuments);
+router.get("/:id", validToken, getDocumentById);
+router.get("/:id/thumbnail", getDocumentThumbnail); // No validToken here
+router.post("/:id/rename", validToken, renameDocumentById);
+router.delete("/:id", validToken, deleteDocument);
 
 export default router;

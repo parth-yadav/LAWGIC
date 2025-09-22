@@ -123,13 +123,10 @@ async function analyzePageForThreatsWithAI(
   }
 }
 
-//MAIN FUNCTION
-export const analyzePdfContent = async (req: Request, res: Response) => {
+// GET request handler - Retrieves existing threats for a document
+export const getExistingThreats = async (req: Request, res: Response) => {
   try {
-    // Handle both GET (query params) and POST (body params) requests
-    const documentId =
-      req.method === "GET" ? (req.query.docId as string) : req.body.documentId;
-    const pagesContent = req.method === "GET" ? null : req.body.pagesContent;
+    const documentId = req.query.docId as string;
     const userId = req.user?.id;
 
     if (!documentId) {
@@ -163,12 +160,121 @@ export const analyzePdfContent = async (req: Request, res: Response) => {
       });
     }
 
-    // Check if threats already exist for this document
+    // Get existing threats for this document
     const existingThreats = await prisma.threat.findMany({
       where: {
         documentId,
       },
       orderBy: [{ pageNumber: "asc" }, { threatNumber: "asc" }],
+    });
+
+    if (existingThreats.length === 0) {
+      return sendResponse({
+        res,
+        success: true,
+        data: {
+          threats: [],
+          summary: {
+            totalThreats: existingThreats.length,
+            isFromCache: false,
+          },
+        },
+        message: "Threats not generated yet for this document",
+      });
+    }
+
+    return sendResponse({
+      res,
+      success: true,
+      data: {
+        threats: existingThreats.map((threat) => ({
+          id: threat.id,
+          exactStringThreat: threat.text,
+          explanation: threat.explanation,
+          severity: threat.severity,
+          category: threat.category,
+          page: threat.pageNumber,
+          number: threat.threatNumber,
+          confidence: threat.confidence,
+          position: threat.position,
+        })),
+        summary: {
+          totalThreats: existingThreats.length,
+          isFromCache: true,
+        },
+      },
+      message: "Threats retrieved from database",
+    });
+  } catch (error: any) {
+    console.error("❌ BACKEND: Failed to get existing threats:", error);
+    return sendResponse({
+      res,
+      success: false,
+      error: {
+        message: getErrorMessage(
+          error,
+          "Failed to retrieve threats for document"
+        ),
+        details: error,
+      },
+      statusCode: 500,
+    });
+  }
+};
+
+// POST request handler - Analyzes new document content and saves threats
+export const analyzeNewThreats = async (req: Request, res: Response) => {
+  try {
+    const { documentId, pagesContent } = req.body;
+    const userId = req.user?.id;
+
+    if (!documentId) {
+      return sendResponse({
+        res,
+        success: false,
+        error: {
+          message: "Document ID is required",
+        },
+        statusCode: 400,
+      });
+    }
+
+    if (!pagesContent || !Array.isArray(pagesContent)) {
+      return sendResponse({
+        res,
+        success: false,
+        error: {
+          message: "pagesContent array is required for new analysis",
+        },
+        statusCode: 400,
+      });
+    }
+
+    // Verify user owns the document
+    const document = await prisma.document.findFirst({
+      where: {
+        id: documentId,
+        userId,
+        deletedAt: null,
+      },
+    });
+
+    if (!document) {
+      return sendResponse({
+        res,
+        success: false,
+        error: {
+          message: "Document not found or access denied",
+        },
+        statusCode: 404,
+      });
+    }
+
+    // Check if threats already exist for this document
+    const existingThreats = await prisma.threat.findMany({
+      where: {
+        documentId,
+      },
     });
 
     if (existingThreats.length > 0) {
@@ -192,22 +298,7 @@ export const analyzePdfContent = async (req: Request, res: Response) => {
             isFromCache: true,
           },
         },
-        message: "Threats retrieved from database",
-      });
-    }
-
-    // If no existing threats, we need the pagesContent to analyze
-    if (!pagesContent || !Array.isArray(pagesContent)) {
-      return sendResponse({
-        res,
-        success: false,
-        error: {
-          message:
-            req.method === "GET"
-              ? "No threats found for this document. Use POST with pagesContent to analyze."
-              : "pagesContent array is required for new analysis",
-        },
-        statusCode: req.method === "GET" ? 404 : 400,
+        message: "Threats already exist for this document",
       });
     }
 
@@ -219,19 +310,21 @@ export const analyzePdfContent = async (req: Request, res: Response) => {
 
     // Process each page
     for (const pageData of pagesContent) {
-      const { page, selectionApiContent } = pageData;
+      const { pageNumber, content } = pageData;
 
-      if (!selectionApiContent || typeof selectionApiContent !== "string") {
-        console.log(`⚠️ BACKEND: Skipping page ${page} - no valid content`);
+      if (!content || typeof content !== "string") {
+        console.log(
+          `⚠️ BACKEND: Skipping page ${pageNumber} - no valid content`
+        );
         continue;
       }
 
-      console.log(`\n🔍 BACKEND: Analyzing page ${page}...`);
+      console.log(`\n🔍 BACKEND: Analyzing page ${pageNumber}...`);
 
       // Analyze this page for threats using AI
       const pageThreats = await analyzePageForThreatsWithAI(
-        selectionApiContent,
-        page
+        content,
+        pageNumber
       );
 
       // Save each threat to database and add to results
@@ -241,7 +334,7 @@ export const analyzePdfContent = async (req: Request, res: Response) => {
             documentId,
             text: threat.exactStringThreat,
             explanation: threat.explanation,
-            pageNumber: page,
+            pageNumber: pageNumber,
             threatNumber: threatNumber,
             severity: threat.severity?.toUpperCase() || "HIGH",
             category: threat.category || "Unknown",
@@ -256,7 +349,7 @@ export const analyzePdfContent = async (req: Request, res: Response) => {
           explanation: threat.explanation,
           severity: threat.severity,
           category: threat.category,
-          page: page,
+          page: pageNumber,
           number: threatNumber,
           confidence: 1.0,
           position: {},
@@ -266,7 +359,7 @@ export const analyzePdfContent = async (req: Request, res: Response) => {
       }
 
       console.log(
-        `✅ BACKEND: Page ${page} analysis complete. Found ${pageThreats.length} threats.`
+        `✅ BACKEND: Page ${pageNumber} analysis complete. Found ${pageThreats.length} threats.`
       );
     }
 

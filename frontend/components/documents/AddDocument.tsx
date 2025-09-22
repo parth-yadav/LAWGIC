@@ -8,6 +8,7 @@ import {
   SheetTitle,
   SheetTrigger,
 } from "@/components/ui/sheet";
+import Image from "next/image";
 import {
   UploadIcon,
   FileIcon,
@@ -385,10 +386,12 @@ export default function AddDocument({
                             {/* Thumbnail preview if available */}
                             {pdfInfo?.thumbnail && (
                               <div className="border-muted mx-auto h-32 w-24 overflow-hidden rounded-lg border shadow-sm">
-                                <img
+                                <Image
                                   src={URL.createObjectURL(pdfInfo.thumbnail)}
                                   alt="PDF thumbnail"
                                   className="h-full w-full object-cover"
+                                  width={96}
+                                  height={128}
                                   onLoad={(e) => {
                                     // Clean up the object URL after the image loads
                                     const img = e.target as HTMLImageElement;

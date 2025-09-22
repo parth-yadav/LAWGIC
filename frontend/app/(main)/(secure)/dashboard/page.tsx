@@ -5,6 +5,7 @@ import DeleteButton from "@/components/documents/DeleteButton";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Separator } from "@/components/ui/separator";
+import Image from "next/image";
 import {
   Select,
   SelectContent,
@@ -262,10 +263,11 @@ export default function DashboardPage() {
                     : "h-16 w-12",
                 )}
               >
-                <img
+                <Image
                   src={`${process.env.NEXT_PUBLIC_SERVER_BASE_URL}/documents/${doc.id}/thumbnail`}
                   alt="Document Thumbnail"
                   className="h-full w-full rounded-lg object-cover"
+                  fill
                   onError={(e) => {
                     // Hide image and show PDF icon on error
                     const img = e.target as HTMLImageElement;

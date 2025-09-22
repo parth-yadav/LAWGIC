@@ -42,6 +42,9 @@ COPY --from=builder /app/build ./build
 COPY --from=deps /app/node_modules ./node_modules
 COPY --from=builder /app/package.json ./package.json
 
+# --- FIX: Copy the generated Prisma Client from the builder stage ---
+COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
+
 # Copy Prisma files for runtime
 COPY --from=builder /app/src/prisma ./src/prisma
 COPY --from=builder /app/prisma.config.ts ./prisma.config.ts

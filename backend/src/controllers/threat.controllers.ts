@@ -339,7 +339,7 @@ export const analyzeNewThreats = async (req: Request, res: Response) => {
             severity: threat.severity?.toUpperCase() || "HIGH",
             category: threat.category || "Unknown",
             confidence: 1.0,
-            position: {}, // You can enhance this based on your needs
+            position: null, // Frontend will calculate and update this
           },
         });
 
@@ -352,7 +352,7 @@ export const analyzeNewThreats = async (req: Request, res: Response) => {
           page: pageNumber,
           number: threatNumber,
           confidence: 1.0,
-          position: {},
+          position: null, // Frontend will calculate and update this
         });
 
         threatNumber++;

@@ -42,6 +42,7 @@ export default function PdfThreats() {
     documentId,
     numPages,
     textLayerRef,
+    pagesRefs,
     jumpToHighlight,
     setStoredThreats,
     addThreatToStorage,
@@ -88,14 +89,85 @@ export default function PdfThreats() {
         convertBackendThreatToHighlight(threat),
       );
       setThreatHighlights(highlights);
+
+      // Also sync to provider's storedThreats for the highlighting system
+      setStoredThreats(highlights);
     } else {
       // No threats from provider
       setThreatsExist(false);
       setIsLoading(false);
       setBackendThreats([]);
       setThreatHighlights([]);
+      setStoredThreats([]); // Clear stored threats as well
     }
-  }, [threats]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [threats]); // convertBackendThreatToHighlight is stable within component lifecycle
+
+  // Calculate positions for threats that need it when text layer becomes available
+  useEffect(() => {
+    const calculateMissingPositions = async () => {
+      if (!textLayerRef.current || threatHighlights.length === 0) {
+        return;
+      }
+
+      const threatsNeedingPosition = threatHighlights.filter(
+        (highlight) => highlight.metadata.needsPositionCalculation
+      );
+
+      if (threatsNeedingPosition.length === 0) {
+        return;
+      }
+
+      console.log(`🔍 THREATS: Calculating positions for ${threatsNeedingPosition.length} threats`);
+
+      // Process threats sequentially to avoid overwhelming the UI
+      for (const highlight of threatsNeedingPosition) {
+        try {
+          const calculatedHighlight = await calculateThreatPosition(highlight);
+          
+          if (calculatedHighlight && !calculatedHighlight.metadata.needsPositionCalculation) {
+            // Update this specific highlight in local state
+            setThreatHighlights(prev => 
+              prev.map(h => h.id === highlight.id ? calculatedHighlight : h)
+            );
+
+            // IMPORTANT: Also update the provider's storedThreats so highlighting system can use it
+            setStoredThreats(prev => {
+              const existingIndex = prev.findIndex(t => t.id === highlight.id);
+              if (existingIndex !== -1) {
+                // Update existing threat
+                const updated = [...prev];
+                updated[existingIndex] = calculatedHighlight;
+                return updated;
+              } else {
+                // Add new threat if not exists
+                return [...prev, calculatedHighlight];
+              }
+            });
+
+            // Cache the position back to the database
+            cachePositionToDatabase(calculatedHighlight);
+          }
+        } catch (error) {
+          console.error(`🔍 THREATS: Error calculating position for threat ${highlight.id}:`, error);
+        }
+
+        // Small delay to avoid blocking the UI
+        await new Promise(resolve => setTimeout(resolve, 50));
+      }
+
+      console.log('✅ THREATS: Position calculations completed');
+    };
+
+    // Only run if we have threats that need position calculation
+    const needsCalculation = threatHighlights.some(h => h.metadata.needsPositionCalculation);
+    if (needsCalculation && textLayerRef.current) {
+      // Run calculation after a short delay to ensure text layer is fully rendered
+      const timeoutId = setTimeout(calculateMissingPositions, 300);
+      return () => clearTimeout(timeoutId);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [threatHighlights]); // Only depend on threatHighlights - other deps are stable
 
   // ========================================
   // HELPER FUNCTIONS
@@ -103,30 +175,260 @@ export default function PdfThreats() {
 
   /**
    * Convert backend threat data to frontend highlight format
+   * Now calculates actual positions using text-finding logic
    */
   const convertBackendThreatToHighlight = (threat: any): Highlight => {
+    // Debug: Log the threat data structure
+    console.log('🔍 THREATS: Converting backend threat to highlight:', {
+      id: threat.id,
+      exactStringThreat: threat.exactStringThreat,
+      text: threat.text,
+      page: threat.page,
+      position: threat.position
+    });
+
+    // Calculate actual position if we have the text layer available
+    let calculatedPosition = {
+      startOffset: 0,
+      endOffset: 0,
+      pageNumber: threat.page || 1,
+      startPageOffset: 0,
+      endPageOffset: 0,
+    };
+
+    // Try to calculate position if text layer is available and threat has cached position
+    if (threat.position && typeof threat.position === 'object' && threat.position.startOffset !== undefined) {
+      // Use cached position from database
+      calculatedPosition = {
+        startOffset: Number(threat.position.startOffset) || 0,
+        endOffset: Number(threat.position.endOffset) || 0,
+        pageNumber: Number(threat.position.pageNumber) || Number(threat.page) || 1,
+        startPageOffset: Number(threat.position.startPageOffset) || 0,
+        endPageOffset: Number(threat.position.endPageOffset) || 0,
+      };
+    }
+
     return {
       id: threat.id,
-      text: threat.exactStringThreat,
-      position: {
-        startOffset: 0, // Will be calculated when needed
-        endOffset: 0,
-        pageNumber: threat.page,
-        startPageOffset: 0,
-        endPageOffset: 0,
-      },
+      text: threat.exactStringThreat || threat.text || '',
+      position: calculatedPosition,
       color: getThreatColor(),
       metadata: {
         id: threat.id,
-        text: threat.exactStringThreat,
+        text: threat.exactStringThreat || threat.text || '',
         note: threat.explanation,
         tags: ["threat", "security", threat.severity?.toLowerCase() || "high"],
         createdAt: new Date().toISOString(),
         author: "threat-analyzer",
+        needsPositionCalculation: !threat.position || threat.position.startOffset === undefined,
       },
       isActive: false,
       isTemporary: false,
     };
+  };
+
+  /**
+   * Calculate position for a threat highlight using text-finding logic
+   */
+  const calculateThreatPosition = async (highlight: Highlight): Promise<Highlight | null> => {
+    if (!textLayerRef.current) {
+      console.warn('🔍 THREATS: Text layer not available for position calculation');
+      return highlight;
+    }
+
+    const pageNumber = highlight.position.pageNumber;
+    const threatText = highlight.text;
+
+    console.log(`🔍 THREATS: Calculating position for threat on page ${pageNumber}: "${threatText.substring(0, 50)}..."`);
+
+    // Find the page element using pagesRefs (same as PdfProvider does)
+    const pageElement = pagesRefs?.current?.get(pageNumber);
+    
+    if (!pageElement) {
+      console.warn(`🔍 THREATS: Page ${pageNumber} element not found in pagesRefs`);
+      // Fallback: try to find by React PDF structure
+      const allPages = textLayerRef.current.querySelectorAll('.react-pdf__Page');
+      const targetPage = Array.from(allPages)[pageNumber - 1]; // 0-indexed
+      
+      if (!targetPage) {
+        console.warn(`🔍 THREATS: Page ${pageNumber} not found via fallback method either`);
+        return highlight;
+      }
+      
+      return await calculatePositionFromPageElement(targetPage, highlight, threatText);
+    }
+
+    return await calculatePositionFromPageElement(pageElement, highlight, threatText);
+  };
+
+  /**
+   * Helper function to calculate position from a specific page element
+   */
+  const calculatePositionFromPageElement = async (
+    pageElement: Element, 
+    highlight: Highlight, 
+    threatText: string
+  ): Promise<Highlight> => {
+    // Find the text content layer within this page
+    const textLayer = pageElement.querySelector(".react-pdf__Page__textContent");
+    
+    if (!textLayer) {
+      console.warn(`🔍 THREATS: Text layer not found within page element`);
+      return highlight;
+    }
+
+    console.log(`🔍 THREATS: Found text layer, attempting to locate text: "${threatText.substring(0, 30)}..."`);
+
+    // Try to select the text using our existing logic
+    const success = selectTextWordByWord(textLayer, threatText);
+
+    if (success) {
+      const selection = window.getSelection();
+      if (selection && selection.rangeCount > 0) {
+        const range = selection.getRangeAt(0);
+
+        // Calculate document-wide offsets
+        const startOffset = getTextOffsetInDocument(
+          range.startContainer,
+          range.startOffset,
+        );
+        const endOffset = getTextOffsetInDocument(
+          range.endContainer,
+          range.endOffset,
+        );
+
+        console.log(
+          `✅ THREATS: Position calculated successfully - start: ${startOffset}, end: ${endOffset}`,
+        );
+
+        // Create updated highlight with calculated position
+        const updatedHighlight: Highlight = {
+          ...highlight,
+          position: {
+            pageNumber: highlight.position.pageNumber,
+            startOffset,
+            endOffset,
+            startPageOffset: startOffset,
+            endPageOffset: endOffset,
+          },
+          metadata: {
+            ...highlight.metadata,
+            needsPositionCalculation: false,
+          },
+        };
+
+        // Clear selection
+        selection.removeAllRanges();
+
+        return updatedHighlight;
+      }
+    }
+
+    // If exact match failed, try a more flexible approach
+    console.log(`🔍 THREATS: Exact match failed, trying fuzzy text search...`);
+    const success2 = await tryFuzzyTextMatch(textLayer, threatText, highlight);
+    if (success2) {
+      return success2;
+    }
+
+    console.warn(`❌ THREATS: Could not calculate position for threat: "${threatText.substring(0, 50)}..."`);
+    return highlight;
+  };
+
+  /**
+   * Fallback fuzzy text matching for difficult cases
+   */
+  const tryFuzzyTextMatch = async (
+    textLayer: Element, 
+    threatText: string, 
+    highlight: Highlight
+  ): Promise<Highlight | null> => {
+    try {
+      // Get all text content from the page
+      const pageText = textLayer.textContent || '';
+      const normalizedPageText = pageText.toLowerCase().replace(/\s+/g, ' ').trim();
+      const normalizedThreatText = threatText.toLowerCase().replace(/\s+/g, ' ').trim();
+      
+      // Try to find the text with some flexibility
+      const index = normalizedPageText.indexOf(normalizedThreatText);
+      
+      if (index !== -1) {
+        console.log(`🔍 THREATS: Found text via fuzzy matching at index ${index}`);
+        
+        // For fuzzy matches, create a basic position estimate
+        const updatedHighlight: Highlight = {
+          ...highlight,
+          position: {
+            pageNumber: highlight.position.pageNumber,
+            startOffset: index,
+            endOffset: index + threatText.length,
+            startPageOffset: index,
+            endPageOffset: index + threatText.length,
+          },
+          metadata: {
+            ...highlight.metadata,
+            needsPositionCalculation: false,
+            matchType: 'fuzzy',
+          },
+        };
+        
+        return updatedHighlight;
+      }
+      
+      // Try partial matching with first few words
+      const words = normalizedThreatText.split(' ').slice(0, 5); // First 5 words
+      for (const word of words) {
+        if (word.length > 3) { // Only meaningful words
+          const wordIndex = normalizedPageText.indexOf(word);
+          if (wordIndex !== -1) {
+            console.log(`🔍 THREATS: Found partial match with word "${word}" at index ${wordIndex}`);
+            
+            const updatedHighlight: Highlight = {
+              ...highlight,
+              position: {
+                pageNumber: highlight.position.pageNumber,
+                startOffset: wordIndex,
+                endOffset: wordIndex + threatText.length,
+                startPageOffset: wordIndex,
+                endPageOffset: wordIndex + threatText.length,
+              },
+              metadata: {
+                ...highlight.metadata,
+                needsPositionCalculation: false,
+                matchType: 'partial',
+              },
+            };
+            
+            return updatedHighlight;
+          }
+        }
+      }
+      
+    } catch (error) {
+      console.error('🔍 THREATS: Error in fuzzy text matching:', error);
+    }
+    
+    return null;
+  };
+
+  /**
+   * Cache calculated position back to the database
+   */
+  const cachePositionToDatabase = async (highlight: Highlight) => {
+    try {
+      // Here you would make an API call to update the threat's position in the database
+      // For now, just log it
+      console.log(`💾 THREATS: Caching position for threat ${highlight.id}:`, highlight.position);
+      
+      // TODO: Implement API call to update threat position
+      // await fetch(`/api/threats/${highlight.id}/position`, {
+      //   method: 'PATCH',
+      //   body: JSON.stringify({ position: highlight.position }),
+      //   headers: { 'Content-Type': 'application/json' }
+      // });
+    } catch (error) {
+      console.error(`💾 THREATS: Failed to cache position for threat ${highlight.id}:`, error);
+    }
   };
 
   // ========================================

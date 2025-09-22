@@ -9,6 +9,7 @@
   "scripts": {
     "dev": "tsx watch src/server.ts",
     "build": "tsc",
+    "prebuild": "npx prisma generate",
     "start": "node build/server.js",
     "lint": "tsc --noEmit",
     "clean": "rm -rf build"

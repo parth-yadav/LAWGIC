@@ -15,7 +15,7 @@ export default async function getUser(): Promise<User | null> {
     if (!accessToken) return null;
 
     const response = await fetch(
-      `${process.env.NEXT_PUBLIC_SERVER_BASE_URL}/auth/user`,
+      `${process.env.NEXT_PUBLIC_SERVER_URL}/auth/user`,
       {
         headers: {
           "Content-Type": "application/json",

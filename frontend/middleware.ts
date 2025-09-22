@@ -14,7 +14,7 @@ export async function middleware(request: NextRequest) {
     if (!refreshToken) return response;
 
     const newTokenResponse = await fetch(
-      `${process.env.NEXT_PUBLIC_SERVER_BASE_URL}/auth/refresh`,
+      `${process.env.NEXT_PUBLIC_SERVER_URL}/auth/refresh`,
       {
         headers: {
           "Content-Type": "application/json",

@@ -21,6 +21,7 @@ export async function middleware(request: NextRequest) {
           "refresh-token": refreshToken,
         },
         cache: "no-store",
+        credentials: "include",
       }
     );
 
@@ -48,6 +49,7 @@ export async function middleware(request: NextRequest) {
       expires: new Date(accessTokenExpiresAt),
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
+      sameSite: "none",
     });
     cookieStore.set({
       name: "refreshToken",
@@ -55,6 +57,7 @@ export async function middleware(request: NextRequest) {
       expires: new Date(refreshTokenExpiresAt),
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
+      sameSite: "none",
     });
 
     response.headers.set("x-access-token", newAccessToken);

@@ -41,10 +41,15 @@ export default function SessionProvider({ children }: { children: ReactNode }) {
       const user = await getUser();
       if (user) {
         setUser(user);
+        console.log("User fetched:", user);
         setStatus("authenticated");
+        console.log("Session status: authenticated");
       } else {
         setUser(null);
+        console.log("User not found");
+       
         setStatus("unauthenticated");
+         console.log("Session status: unauthenticated");
       }
     } catch (error) {
       console.error("Failed to fetch session:", error);

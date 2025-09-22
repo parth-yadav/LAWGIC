@@ -3,7 +3,7 @@ import cors from "cors";
 import dotenv from "dotenv";
 import cookieParser from "cookie-parser";
 import authRouter from "./routes/auth.routes.js";
-import validateEnv from "./utils/validateEnv.js";
+// import validateEnv from "./utils/validateEnv.js";
 import explainRouter from "./routes/explain.routes.js";
 import documentRouter from "./routes/document.routes.js";
 import threatRouter from "./routes/threat.routes.js";
@@ -39,28 +39,32 @@ app.use("/explanations", explainRouter);
 app.use("/threats", threatRouter);
 app.use("/highlights", highlightRouter);
 
-validateEnv()
-  .then(() => {
-    const server = app.listen(PORT, () => {
-      console.log(`Server is running on port ${PORT}`);
-    });
+// validateEnv()
+//   .then(() => {
+//     const server = app.listen(PORT, () => {
+//       console.log(`Server is running on port ${PORT}`);
+//     });
 
-    process.on("SIGTERM", () => {
-      console.log("SIGTERM received, shutting down gracefully");
-      server.close(() => {
-        console.log("Process terminated");
-      });
-    });
+//     process.on("SIGTERM", () => {
+//       console.log("SIGTERM received, shutting down gracefully");
+//       server.close(() => {
+//         console.log("Process terminated");
+//       });
+//     });
 
-    process.on("SIGINT", () => {
-      console.log("SIGINT received, shutting down gracefully");
-      server.close(() => {
-        console.log("Process terminated");
-      });
-    });
-  })
-  .catch(() => {
-    console.error(
-      "Check your .env file and ensure all variables are set correctly"
-    );
-  });
+//     process.on("SIGINT", () => {
+//       console.log("SIGINT received, shutting down gracefully");
+//       server.close(() => {
+//         console.log("Process terminated");
+//       });
+//     });
+//   })
+//   .catch(() => {
+//     console.error(
+//       "Check your .env file and ensure all variables are set correctly"
+//     );
+//   });
+
+app.listen(PORT, () => {
+  console.log(`Server is running on port ${PORT}`);
+});

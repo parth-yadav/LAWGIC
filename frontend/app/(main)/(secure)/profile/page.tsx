@@ -1,17 +1,18 @@
-import getUser from "@/auth/getUser";
+"use client";
 import RevealHero from "@/components/animations/RevealHero";
-import Unauthenticated from "@/components/auth/Unauthenticated";
 import ProfileForm from "@/components/profile/ProfileForm";
+import { useSession } from "@/providers/SessionProvider";
 
-export default async function ProfilePage() {
-  const user = await getUser();
+export default function ProfilePage() {
+  const { user } = useSession();
 
-  if (!user) return <Unauthenticated />;
-
-  return (
-    <section className="flex w-full flex-col p-4 items-center max-w-2xl mx-auto">
-      <RevealHero className="font-extrabold text-3xl mb-8">Profile</RevealHero>
-      <ProfileForm user={user} />
-    </section>
-  );
+  if (user)
+    return (
+      <section className="mx-auto flex w-full max-w-2xl flex-col items-center p-4">
+        <RevealHero className="mb-8 text-3xl font-extrabold">
+          Profile
+        </RevealHero>
+        <ProfileForm user={user} />
+      </section>
+    );
 }

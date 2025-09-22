@@ -1,38 +1,17 @@
-"use server";
-
-import { cookies, headers } from "next/headers";
+"use client";
+import ApiClient from "@/utils/ApiClient";
 
 export default async function getUser(): Promise<User | null> {
   try {
-    const cookieStore = await cookies();
-    const headersStore = await headers();
+    const response = await ApiClient.get("/auth/user");
 
-    const accessToken =
-      cookieStore.get("accessToken")?.value ??
-      headersStore.get("x-access-token") ??
-      null;
+    const success: boolean = response.data.success;
+    const user: User | undefined = response.data.data.user;
 
-    if (!accessToken) return null;
-
-    const response = await fetch(
-      `${process.env.NEXT_PUBLIC_SERVER_BASE_URL}/auth/user`,
-      {
-        headers: {
-          "Content-Type": "application/json",
-          "access-token": accessToken,
-        },
-        cache: "no-store",
-      }
-    );
-    if (!response.ok) {
+    if (!success || !user) {
       console.error("Failed to fetch user.");
       return null;
     }
-
-    const {
-      data: { user },
-    }: { data: { user: User } } = await response.json();
-
     return user;
   } catch (error) {
     return null;

@@ -1,10 +1,8 @@
 "use client";
 import RevealHero from "@/components/animations/RevealHero";
 import AddDocument from "@/components/documents/AddDocument";
-import DeleteButton from "@/components/documents/DeleteButton";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Separator } from "@/components/ui/separator";
 import Image from "next/image";
 import {
   Select,

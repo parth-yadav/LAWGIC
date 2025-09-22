@@ -11,7 +11,7 @@ import {
   Dispatch,
 } from "react";
 
-interface SessionContextType {
+export interface SessionContextType {
   user: User | null;
   status: "loading" | "authenticated" | "unauthenticated";
   error: string | null;

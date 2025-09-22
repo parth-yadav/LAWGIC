@@ -2,15 +2,9 @@ import { getSignedFileUrl } from "@/utils/S3helper";
 import { NextRequest, NextResponse } from "next/server";
 import { join } from "path";
 import { promises as fs } from "fs";
-import getUser from "@/auth/getUser";
 
 export const GET = async (request: NextRequest) => {
   try {
-    const user = await getUser();
-    if (!user) {
-      throw new Error("Missing user");
-    }
-
     const searchParams = request.nextUrl.searchParams;
     const url = searchParams.get("url");
 
@@ -35,7 +29,7 @@ export const GET = async (request: NextRequest) => {
     const fallbackImagePath = join(
       process.cwd(),
       "public",
-      "/images/blankProfilePicture.jpg"
+      "/images/blankProfilePicture.jpg",
     );
 
     const imageData = await fs.readFile(fallbackImagePath);

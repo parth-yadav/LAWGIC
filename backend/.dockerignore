@@ -99,9 +99,6 @@ README.md
 readme.md
 *.md
 
-# TypeScript config (not needed in production)
-tsconfig.json
-
 # Testing
 test
 tests

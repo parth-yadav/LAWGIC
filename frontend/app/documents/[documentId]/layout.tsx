@@ -7,10 +7,12 @@ export default async function DocumentLayout({
 }: {
   children: React.ReactNode;
 }) {
-  <AuthGuard fallback={<Unauthenticated />}>
-    <main className="flex h-dvh flex-row">
-      <DocumentSidebar />
-      {children}
-    </main>
-  </AuthGuard>;
+  return (
+    <AuthGuard fallback={<Unauthenticated />}>
+      <main className="flex h-dvh flex-row">
+        <DocumentSidebar />
+        {children}
+      </main>
+    </AuthGuard>
+  );
 }

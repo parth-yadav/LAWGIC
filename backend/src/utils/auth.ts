@@ -1,6 +1,7 @@
 import { CookieOptions } from "express";
 import jwt from "jsonwebtoken";
 import { StringValue } from "ms";
+import ms from "ms";
 
 export const refreshSecret: jwt.Secret = process.env.REFRESH_TOKEN_SECRET ?? "";
 export const accessSecret: jwt.Secret = process.env.ACCESS_TOKEN_SECRET ?? "";
@@ -39,8 +40,6 @@ export const testOtp = process.env.TEST_OTP ?? null;
 
 export const testUser =
   testMail && testOtp ? { email: testMail, otp: testOtp } : null;
-
-import ms from "ms";
 
 export function getExpiryDate(timeString: string) {
   const milliseconds = ms(timeString as ms.StringValue);

@@ -262,7 +262,7 @@ export default function DashboardPage() {
                 )}
               >
                 <Image
-                  src={`${process.env.NEXT_PUBLIC_SERVER_BASE_URL}/documents/${doc.id}/thumbnail`}
+                  src={`${process.env.NEXT_PUBLIC_SERVER_URL}/documents/${doc.id}/thumbnail`}
                   alt="Document Thumbnail"
                   className="h-full w-full rounded-lg object-cover"
                   fill

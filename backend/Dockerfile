@@ -3,14 +3,12 @@ FROM node:20-alpine AS base
 
 # Install dependencies only when needed
 FROM base AS deps
-# Check https://github.com/nodejs/docker-node/tree/b4117f9333da4138b03a546ec926ef50a31506c3#nodealpine to understand why libc6-compat might be needed.
 RUN apk add --no-cache libc6-compat
-
 WORKDIR /app
 
 # Copy package files
 COPY package.json package-lock.json* ./
-# Install dependencies
+# Install production dependencies
 RUN npm ci --only=production && npm cache clean --force
 
 # Development dependencies for building
@@ -23,16 +21,20 @@ RUN npm ci
 # Build the application
 FROM base AS builder
 WORKDIR /app
+
+# Copy node_modules from build-deps
 COPY --from=build-deps /app/node_modules ./node_modules
-COPY . .
 
-# Generate Prisma client
-RUN npx prisma generate
+# Copy configuration files
+COPY package.json tsconfig.json prisma.config.ts ./
 
-# Build the TypeScript application
+# Copy source code
+COPY src ./src
+
+# Generate Prisma client and build
 RUN npm run build
 
-# Production image, copy all the files and run the application
+# Production image
 FROM base AS runner
 WORKDIR /app
 
@@ -40,16 +42,17 @@ WORKDIR /app
 RUN addgroup --system --gid 1001 nodejs
 RUN adduser --system --uid 1001 nodejs
 
-# Copy built application
+# Copy built application and production dependencies
 COPY --from=builder /app/build ./build
-COPY --from=builder /app/node_modules ./node_modules
+COPY --from=deps /app/node_modules ./node_modules
 COPY --from=builder /app/package.json ./package.json
 
-# Copy Prisma files for migrations
-COPY --from=builder /app/src/prisma ./prisma
+# Copy Prisma files for runtime
+COPY --from=builder /app/src/prisma ./src/prisma
+COPY --from=builder /app/prisma.config.ts ./prisma.config.ts
 
 # Copy public assets if they exist
-COPY --from=builder /app/src/public ./public
+COPY --from=builder /app/src/public ./public 2>/dev/null || true
 
 # Change ownership to nodejs user
 RUN chown -R nodejs:nodejs /app

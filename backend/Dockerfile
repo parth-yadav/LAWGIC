@@ -5,10 +5,7 @@ FROM node:20-alpine AS base
 FROM base AS deps
 RUN apk add --no-cache libc6-compat
 WORKDIR /app
-
-# Copy package files
 COPY package.json package-lock.json* ./
-# Install production dependencies
 RUN npm ci --only=production && npm cache clean --force
 
 # Development dependencies for building
@@ -25,10 +22,8 @@ WORKDIR /app
 # Copy node_modules from build-deps
 COPY --from=build-deps /app/node_modules ./node_modules
 
-# Copy configuration files
+# Copy all necessary files for build
 COPY package.json tsconfig.json prisma.config.ts ./
-
-# Copy source code
 COPY src ./src
 
 # Generate Prisma client and build
@@ -51,8 +46,8 @@ COPY --from=builder /app/package.json ./package.json
 COPY --from=builder /app/src/prisma ./src/prisma
 COPY --from=builder /app/prisma.config.ts ./prisma.config.ts
 
-# Copy public assets if they exist
-COPY --from=builder /app/src/public ./public 2>/dev/null || true
+# Copy static assets
+COPY --from=builder /app/src/public ./src/public
 
 # Change ownership to nodejs user
 RUN chown -R nodejs:nodejs /app

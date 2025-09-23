@@ -4,6 +4,7 @@ import { GoogleGenerativeAI } from "@google/generative-ai";
 import { sendResponse } from "../utils/ResponseHelpers.js";
 import { getErrorMessage } from "../utils/utils.js";
 import prisma from "../prisma/client.js";
+import { Prisma } from "@prisma/client";
 
 const key = process.env.COMPLEX_WORDS_API_KEY;
 
@@ -339,7 +340,7 @@ export const analyzeNewThreats = async (req: Request, res: Response) => {
             severity: threat.severity?.toUpperCase() || "HIGH",
             category: threat.category || "Unknown",
             confidence: 1.0,
-            position: null, // Frontend will calculate and update this
+            position: Prisma.JsonNull, // Frontend will calculate and update this
           },
         });
 

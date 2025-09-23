@@ -320,7 +320,8 @@ export const PDFProvider = ({
           // Convert backend threats to highlight format for display
           const threatHighlights = threats.map((threat: any) => ({
             id: threat.id,
-            text: threat.text,
+            text: threat.exactStringThreat || threat.text,
+            page: threat.page, // ✅ CRITICAL: Include page number from backend
             color: getThreatColor(),
             position: threat.position,
             metadata: {

@@ -158,6 +158,11 @@ export interface HighlightPosition {
  * @property {string} createdAt - ISO timestamp of when highlight was created
  * @property {string} [updatedAt] - ISO timestamp of last modification
  * @property {string} [author] - Optional author identifier
+ * @property {boolean} [needsPositionCalculation] - Whether position calculation is needed
+ * @property {string} [matchType] - Type of text match (exact, fuzzy, partial)
+ * @property {string} [threatSeverity] - Threat severity level for threat highlights
+ * @property {string} [threatType] - Type of threat for threat highlights
+ * @property {string} [explanation] - Detailed explanation for threats
  */
 export interface HighlightMetadata {
   id: string;
@@ -167,6 +172,11 @@ export interface HighlightMetadata {
   createdAt: string;
   updatedAt?: string;
   author?: string;
+  needsPositionCalculation?: boolean;
+  matchType?: string;
+  threatSeverity?: string;
+  threatType?: string;
+  explanation?: string;
 }
 
 // ========================================

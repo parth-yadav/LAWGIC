@@ -75,19 +75,83 @@ export default function PdfThreats() {
       setIsLoading(false);
 
       // Convert threat analysis result to local format if needed
-      const threatList = threats.pages.flatMap((page) =>
-        page.threats.map((threat: any) => ({
-          ...threat,
-          page: page.page,
-        })),
-      );
+      console.log('🔍 THREATS: Raw threats data from backend:', threats);
+      console.log('🔍 THREATS: threats.pages:', threats.pages);
+      
+      const threatList = threats.pages.flatMap((page, pageIndex) => {
+        console.log(`🔍 THREATS: Processing page ${page.page} (index ${pageIndex}) with ${page.threats.length} threats`);
+        console.log(`🔍 THREATS: Page object:`, page);
+        console.log(`🔍 THREATS: page.page value:`, page.page, 'type:', typeof page.page, 'truthy:', !!page.page);
+        
+        // Guard against missing page numbers
+        const actualPageNumber = page.page || (pageIndex + 1);
+        if (!page.page) {
+          console.warn(`⚠️ THREATS: page.page is missing! Using fallback: ${actualPageNumber}`);
+        }
+        
+        return page.threats.map((threat: any) => {
+          console.log(`🔍 THREATS: Before assignment - threat object:`, threat);
+          console.log(`🔍 THREATS: Before assignment - threat.page:`, threat.page);
+          console.log(`🔍 THREATS: actualPageNumber being assigned:`, actualPageNumber);
+          
+          const threatWithPage = {
+            ...threat,
+            page: actualPageNumber,
+            // Ensure we preserve any existing page number if it's valid
+            ...(threat.page && threat.page > 0 ? { page: threat.page } : {}),
+          };
+          
+          // Final verification - use the highest priority page number
+          const finalPageNumber = threatWithPage.page || actualPageNumber;
+          if (finalPageNumber !== threatWithPage.page) {
+            threatWithPage.page = finalPageNumber;
+            console.log(`🔧 THREATS: Corrected page number to: ${finalPageNumber}`);
+          }
+          
+          console.log(`🔍 THREATS: After assignment - threatWithPage:`, threatWithPage);
+          console.log(`🔍 THREATS: After assignment - threatWithPage.page:`, threatWithPage.page);
+          
+          // Verify the assignment worked
+          if (threatWithPage.page !== finalPageNumber) {
+            console.error(`❌ THREATS: Page assignment failed! Expected ${finalPageNumber}, got ${threatWithPage.page}`);
+          } else {
+            console.log(`✅ THREATS: Page assignment successful: ${threatWithPage.page}`);
+          }
+          
+          return threatWithPage;
+        });
+      });
 
+      console.log('🔍 THREATS: Final threat list:', threatList);
       setBackendThreats(threatList);
 
+      // Check if PDF is ready for position calculation
+      const pagesReady = pagesRefs?.current?.size > 0 && textLayerRef?.current;
+      console.log(`🔍 THREATS: PDF readiness check - pagesRefs size: ${pagesRefs?.current?.size}, textLayerRef: ${!!textLayerRef?.current}`);
+      
+      if (!pagesReady) {
+        console.warn('⚠️ THREATS: PDF not fully loaded yet, delaying threat position calculation');
+        // Set a delayed retry
+        setTimeout(() => {
+          console.log('🔄 THREATS: Retrying threat position calculation after PDF load');
+          // Re-trigger the useEffect by updating a dependency
+          const retryHighlights = threatList.map((threat: any) => convertBackendThreatToHighlight(threat));
+          setThreatHighlights(retryHighlights);
+          setStoredThreats(retryHighlights);
+        }, 1000);
+        return;
+      }
+
       // Convert to highlight format for display
-      const highlights = threatList.map((threat: any) =>
-        convertBackendThreatToHighlight(threat),
-      );
+      console.log('🔍 THREATS: Converting to highlight format...');
+      const highlights = threatList.map((threat: any, index: number) => {
+        console.log(`🔍 THREATS: Converting threat ${index + 1}/${threatList.length}:`, threat);
+        const highlight = convertBackendThreatToHighlight(threat);
+        console.log(`🔍 THREATS: Converted to highlight:`, highlight);
+        return highlight;
+      });
+      
+      console.log('🔍 THREATS: All highlights created:', highlights);
       setThreatHighlights(highlights);
 
       // Also sync to provider's storedThreats for the highlighting system
@@ -123,9 +187,13 @@ export default function PdfThreats() {
       // Process threats sequentially to avoid overwhelming the UI
       for (const highlight of threatsNeedingPosition) {
         try {
+          console.log(`🔍 THREATS: Processing threat ${highlight.id} - page: ${highlight.position.pageNumber}, needsCalc: ${highlight.metadata.needsPositionCalculation}`);
+          
           const calculatedHighlight = await calculateThreatPosition(highlight);
           
           if (calculatedHighlight && !calculatedHighlight.metadata.needsPositionCalculation) {
+            console.log(`✅ THREATS: Successfully calculated position for threat ${highlight.id}`);
+            
             // Update this specific highlight in local state
             setThreatHighlights(prev => 
               prev.map(h => h.id === highlight.id ? calculatedHighlight : h)
@@ -184,20 +252,35 @@ export default function PdfThreats() {
       exactStringThreat: threat.exactStringThreat,
       text: threat.text,
       page: threat.page,
-      position: threat.position
+      position: threat.position,
+      hasPosition: !!threat.position,
+      positionType: typeof threat.position,
+      positionKeys: threat.position ? Object.keys(threat.position) : [],
     });
+
+    // CRITICAL: Check what page number we're actually using
+    const pageNumber = threat.page || 1;
+    console.log(`🔍 THREATS: Page number determination - threat.page: ${threat.page}, fallback used: ${!threat.page}, final pageNumber: ${pageNumber}`);
+    
+    if (!threat.page) {
+      console.error(`❌ THREATS: No page number provided in threat data! Using fallback page 1`);
+      console.log('🔍 THREATS: Full threat object:', JSON.stringify(threat, null, 2));
+    }
 
     // Calculate actual position if we have the text layer available
     let calculatedPosition = {
       startOffset: 0,
       endOffset: 0,
-      pageNumber: threat.page || 1,
+      pageNumber: pageNumber,
       startPageOffset: 0,
       endPageOffset: 0,
     };
 
+    console.log('🔍 THREATS: Initial calculated position:', calculatedPosition);
+
     // Try to calculate position if text layer is available and threat has cached position
     if (threat.position && typeof threat.position === 'object' && threat.position.startOffset !== undefined) {
+      console.log('🔍 THREATS: Using cached position from backend');
       // Use cached position from database
       calculatedPosition = {
         startOffset: Number(threat.position.startOffset) || 0,
@@ -205,7 +288,7 @@ export default function PdfThreats() {
         pageNumber: Number(threat.position.pageNumber) || Number(threat.page) || 1,
         startPageOffset: Number(threat.position.startPageOffset) || 0,
         endPageOffset: Number(threat.position.endPageOffset) || 0,
-      };
+      }; 
     }
 
     return {
@@ -231,6 +314,11 @@ export default function PdfThreats() {
    * Calculate position for a threat highlight using text-finding logic
    */
   const calculateThreatPosition = async (highlight: Highlight): Promise<Highlight | null> => {
+    console.log(`🔍 THREATS: Starting position calculation for threat ${highlight.id}`);
+    console.log(`🔍 THREATS: Current highlight position:`, highlight.position);
+    console.log(`🔍 THREATS: Threat text: "${highlight.text}"`);
+    console.log(`🔍 THREATS: Metadata:`, highlight.metadata);
+    
     if (!textLayerRef.current) {
       console.warn('🔍 THREATS: Text layer not available for position calculation');
       return highlight;
@@ -239,22 +327,49 @@ export default function PdfThreats() {
     const pageNumber = highlight.position.pageNumber;
     const threatText = highlight.text;
 
+    // CRITICAL: Validate page number
+    console.log(`🔍 THREATS: Page number from highlight: ${pageNumber} (type: ${typeof pageNumber})`);
+    if (!pageNumber || pageNumber < 1) {
+      console.error(`❌ THREATS: Invalid page number! pageNumber: ${pageNumber}`);
+      console.log('🔍 THREATS: Full highlight object:', JSON.stringify(highlight, null, 2));
+      return highlight;
+    }
+
     console.log(`🔍 THREATS: Calculating position for threat on page ${pageNumber}: "${threatText.substring(0, 50)}..."`);
+
+    // Debug pagesRefs state before lookup
+    console.log('🔍 THREATS: pagesRefs debug info:', {
+      exists: !!pagesRefs?.current,
+      size: pagesRefs?.current?.size || 0,
+      keys: Array.from(pagesRefs?.current?.keys() || []),
+      hasPageNumber: pagesRefs?.current?.has(pageNumber),
+      requestedPageNumber: pageNumber,
+      pageNumberType: typeof pageNumber
+    });
 
     // Find the page element using pagesRefs (same as PdfProvider does)
     const pageElement = pagesRefs?.current?.get(pageNumber);
     
     if (!pageElement) {
-      console.warn(`🔍 THREATS: Page ${pageNumber} element not found in pagesRefs`);
+      console.error(`❌ THREATS: Page ${pageNumber} element not found in pagesRefs`);
+      console.log('🔍 THREATS: Available pages in pagesRefs:', Array.from(pagesRefs?.current?.keys() || []));
+      console.log('🔍 THREATS: pagesRefs.current exists:', !!pagesRefs?.current);
+      
       // Fallback: try to find by React PDF structure
+      if (!textLayerRef?.current) {
+        console.error('❌ THREATS: textLayerRef also not available, cannot proceed');
+        return highlight;
+      }
+      
       const allPages = textLayerRef.current.querySelectorAll('.react-pdf__Page');
       const targetPage = Array.from(allPages)[pageNumber - 1]; // 0-indexed
       
       if (!targetPage) {
-        console.warn(`🔍 THREATS: Page ${pageNumber} not found via fallback method either`);
+        console.warn(`🔍 THREATS: Page ${pageNumber} not found via fallback method either (total pages: ${allPages.length})`);
         return highlight;
       }
       
+      console.log(`✅ THREATS: Using fallback method for page ${pageNumber}`);
       return await calculatePositionFromPageElement(targetPage, highlight, threatText);
     }
 
@@ -279,37 +394,79 @@ export default function PdfThreats() {
 
     console.log(`🔍 THREATS: Found text layer, attempting to locate text: "${threatText.substring(0, 30)}..."`);
 
-    // Try to select the text using our existing logic
-    const success = selectTextWordByWord(textLayer, threatText);
+    // Try multiple approaches to find the threat text
+    let success = false;
+    
+    // Approach 1: Direct word-by-word search
+    success = selectTextWordByWord(textLayer, threatText);
+    
+    // Approach 2: Fallback - search for normalized text
+    if (!success) {
+      console.log('🔍 THREATS: Word-by-word search failed, trying normalized search...');
+      success = selectTextDirectly(textLayer, threatText);
+    }
+    
+    // Approach 3: Last resort - partial text search
+    if (!success && threatText.length > 20) {
+      console.log('🔍 THREATS: Direct search failed, trying partial text search...');
+      const partialText = threatText.substring(0, Math.min(threatText.length, 30)).trim();
+      success = selectTextDirectly(textLayer, partialText);
+    }
 
     if (success) {
       const selection = window.getSelection();
       if (selection && selection.rangeCount > 0) {
         const range = selection.getRangeAt(0);
 
-        // Calculate document-wide offsets
-        const startOffset = getTextOffsetInDocument(
+        // Calculate PAGE-RELATIVE offsets first
+        const pageStartOffset = getTextOffsetInPage(
+          textLayer,
           range.startContainer,
           range.startOffset,
         );
-        const endOffset = getTextOffsetInDocument(
+        const pageEndOffset = getTextOffsetInPage(
+          textLayer,
           range.endContainer,
           range.endOffset,
         );
 
-        console.log(
-          `✅ THREATS: Position calculated successfully - start: ${startOffset}, end: ${endOffset}`,
+        // Convert to DOCUMENT-WIDE offsets for the highlighting system
+        const documentStartOffset = convertPageOffsetToDocumentOffset(
+          highlight.position.pageNumber,
+          pageStartOffset
         );
+        const documentEndOffset = convertPageOffsetToDocumentOffset(
+          highlight.position.pageNumber,
+          pageEndOffset
+        );
+
+        console.log(
+          `✅ THREATS: Position calculated - page ${highlight.position.pageNumber}, page-relative: ${pageStartOffset}-${pageEndOffset}, document-wide: ${documentStartOffset}-${documentEndOffset}`,
+        );
+        
+        // Debug: Verify the calculated offsets match the highlighting system expectations
+        if (textLayerRef.current) {
+          const textLayerFullText = textLayerRef.current.textContent || "";
+          const extractedText = textLayerFullText.slice(documentStartOffset, documentEndOffset);
+          console.log(`🔍 THREATS: Verification - total document text length: ${textLayerFullText.length}`);
+          console.log(`🔍 THREATS: Verification - extracted text from calculated offsets: "${extractedText}"`);
+          console.log(`🔍 THREATS: Verification - threat text: "${threatText}"`);
+          console.log(`🔍 THREATS: Verification - matches threat text: ${extractedText === threatText}`);
+          
+          if (extractedText !== threatText) {
+            console.error(`❌ THREATS: OFFSET MISMATCH! Expected "${threatText}" but got "${extractedText}"`);
+          }
+        }
 
         // Create updated highlight with calculated position
         const updatedHighlight: Highlight = {
           ...highlight,
           position: {
             pageNumber: highlight.position.pageNumber,
-            startOffset,
-            endOffset,
-            startPageOffset: startOffset,
-            endPageOffset: endOffset,
+            startOffset: documentStartOffset, // Use document-wide for highlighting system
+            endOffset: documentEndOffset,     // Use document-wide for highlighting system
+            startPageOffset: pageStartOffset,  // Keep page-relative for reference
+            endPageOffset: pageEndOffset,      // Keep page-relative for reference
           },
           metadata: {
             ...highlight.metadata,
@@ -353,15 +510,25 @@ export default function PdfThreats() {
       const index = normalizedPageText.indexOf(normalizedThreatText);
       
       if (index !== -1) {
-        console.log(`🔍 THREATS: Found text via fuzzy matching at index ${index}`);
+        console.log(`🔍 THREATS: Found text via fuzzy matching at page-relative index ${index}`);
+        
+        // Convert page-relative offsets to document-wide offsets
+        const documentStartOffset = convertPageOffsetToDocumentOffset(
+          highlight.position.pageNumber,
+          index
+        );
+        const documentEndOffset = convertPageOffsetToDocumentOffset(
+          highlight.position.pageNumber,
+          index + threatText.length
+        );
         
         // For fuzzy matches, create a basic position estimate
         const updatedHighlight: Highlight = {
           ...highlight,
           position: {
             pageNumber: highlight.position.pageNumber,
-            startOffset: index,
-            endOffset: index + threatText.length,
+            startOffset: documentStartOffset,
+            endOffset: documentEndOffset,
             startPageOffset: index,
             endPageOffset: index + threatText.length,
           },
@@ -381,14 +548,24 @@ export default function PdfThreats() {
         if (word.length > 3) { // Only meaningful words
           const wordIndex = normalizedPageText.indexOf(word);
           if (wordIndex !== -1) {
-            console.log(`🔍 THREATS: Found partial match with word "${word}" at index ${wordIndex}`);
+            console.log(`🔍 THREATS: Found partial match with word "${word}" at page-relative index ${wordIndex}`);
+            
+            // Convert page-relative offsets to document-wide offsets
+            const documentStartOffset = convertPageOffsetToDocumentOffset(
+              highlight.position.pageNumber,
+              wordIndex
+            );
+            const documentEndOffset = convertPageOffsetToDocumentOffset(
+              highlight.position.pageNumber,
+              wordIndex + threatText.length
+            );
             
             const updatedHighlight: Highlight = {
               ...highlight,
               position: {
                 pageNumber: highlight.position.pageNumber,
-                startOffset: wordIndex,
-                endOffset: wordIndex + threatText.length,
+                startOffset: documentStartOffset,
+                endOffset: documentEndOffset,
                 startPageOffset: wordIndex,
                 endPageOffset: wordIndex + threatText.length,
               },
@@ -539,6 +716,96 @@ export default function PdfThreats() {
     start: number;
     end: number;
   }
+
+  /**
+   * Direct text search and selection approach for simpler matching
+   */
+  const selectTextDirectly = (
+    root: Node | null,
+    searchText: string,
+  ): boolean => {
+    if (!root) return false;
+
+    // Get the full text content
+    const fullText = root.textContent || "";
+    console.log(`🔍 THREATS: Direct search in ${fullText.length} characters for: "${searchText.substring(0, 30)}..."`);
+    
+    // Normalize both texts for comparison
+    const normalizedFullText = fullText.replace(/\s+/g, ' ').trim().toLowerCase();
+    const normalizedSearchText = searchText.replace(/\s+/g, ' ').trim().toLowerCase();
+    
+    // Find the position
+    const position = normalizedFullText.indexOf(normalizedSearchText);
+    if (position === -1) {
+      console.log('🔍 THREATS: Normalized text not found');
+      return false;
+    }
+    
+    console.log(`🔍 THREATS: Found normalized text at position ${position}`);
+    
+    // Try to select using the simple text search
+    return selectTextByPosition(root, searchText, position);
+  };
+
+  /**
+   * Select text by finding it at a specific position in the content
+   */
+  const selectTextByPosition = (
+    root: Node,
+    targetText: string,
+    approximatePosition: number
+  ): boolean => {
+    // Create a tree walker to find text nodes
+    const walker = document.createTreeWalker(
+      root,
+      NodeFilter.SHOW_TEXT,
+      null
+    );
+
+    let currentPosition = 0;
+    let foundNode: Node | null = null;
+    let nodeStartPosition = 0;
+
+    // Find the text node that contains our approximate position
+    let node;
+    while ((node = walker.nextNode())) {
+      const nodeText = node.textContent || "";
+      const nodeEndPosition = currentPosition + nodeText.length;
+      
+      if (approximatePosition >= currentPosition && approximatePosition < nodeEndPosition) {
+        foundNode = node;
+        nodeStartPosition = currentPosition;
+        break;
+      }
+      currentPosition = nodeEndPosition;
+    }
+
+    if (!foundNode) {
+      console.log('🔍 THREATS: Could not find text node at position');
+      return false;
+    }
+
+    // Try to select the target text starting from this node
+    const range = document.createRange();
+    const nodeOffset = approximatePosition - nodeStartPosition;
+    
+    try {
+      range.setStart(foundNode, Math.max(0, nodeOffset));
+      range.setEnd(foundNode, Math.min(foundNode.textContent?.length || 0, nodeOffset + targetText.length));
+      
+      const selection = window.getSelection();
+      if (selection) {
+        selection.removeAllRanges();
+        selection.addRange(range);
+        console.log('✅ THREATS: Successfully selected text using position method');
+        return true;
+      }
+    } catch (error) {
+      console.log('🔍 THREATS: Error selecting text by position:', error);
+    }
+
+    return false;
+  };
 
   /**
    * Finds and selects text that may span multiple text nodes/divs
@@ -800,6 +1067,34 @@ export default function PdfThreats() {
   };
 
   /**
+   * Calculate text offset within a specific page (page-relative)
+   * Uses the same TreeWalker logic as the main highlighting system
+   */
+  const getTextOffsetInPage = (
+    pageTextLayer: Element,
+    targetNode: Node,
+    targetOffset: number,
+  ): number => {
+    // Use the exact same TreeWalker logic as the highlighting utils
+    let textOffset = 0;
+    const walker = document.createTreeWalker(
+      pageTextLayer,
+      NodeFilter.SHOW_TEXT,
+      null
+    );
+
+    let currentNode: Node | null;
+    while ((currentNode = walker.nextNode())) {
+      if (currentNode === targetNode) {
+        return textOffset + targetOffset;
+      }
+      textOffset += currentNode.textContent?.length || 0;
+    }
+
+    return textOffset;
+  };
+
+  /**
    * Calculate text offset within the entire document (document-absolute)
    */
   const getTextOffsetInDocument = (
@@ -829,28 +1124,40 @@ export default function PdfThreats() {
 
   /**
    * Convert page-relative offset to document-absolute offset
+   * Uses textLayerRef to match the highlighting system exactly
    */
-  const convertToDocumentOffset = (
+  const convertPageOffsetToDocumentOffset = (
     pageNumber: number,
     pageRelativeOffset: number,
   ): number => {
-    if (!textLayerRef.current) return pageRelativeOffset;
+    if (!textLayerRef?.current) {
+      console.warn('🔍 THREATS: textLayerRef not available for offset conversion');
+      return pageRelativeOffset;
+    }
 
     let documentOffset = 0;
+    console.log(`🔍 THREATS: Converting page ${pageNumber} offset ${pageRelativeOffset} to document offset`);
 
-    // Add text from all previous pages
+    // Add text from all previous pages using textLayerRef (same as highlighting system)
     for (let pageNum = 1; pageNum < pageNumber; pageNum++) {
       const pageElement = textLayerRef.current.querySelector(
-        `[data-page-number="${pageNum}"]`,
+        `[data-page-number="${pageNum}"] .react-pdf__Page__textContent`
       );
       if (pageElement) {
         const pageText = pageElement.textContent || "";
+        console.log(`🔍 THREATS: Page ${pageNum} text length: ${pageText.length}, adding to offset`);
         documentOffset += pageText.length;
+      } else {
+        console.warn(`🔍 THREATS: Could not find text content for page ${pageNum}`);
       }
     }
 
+    console.log(`🔍 THREATS: Total offset from previous pages: ${documentOffset}, adding page offset: ${pageRelativeOffset}`);
+
     // Add the page-relative offset
     documentOffset += pageRelativeOffset;
+    
+    console.log(`🔍 THREATS: Final document offset: ${documentOffset}`);
 
     return documentOffset;
   };

@@ -131,9 +131,9 @@ export default function AddDocument({
       URL.revokeObjectURL(fileUrl);
     } catch (error) {
       console.error("Error processing PDF:", error);
-      toast.error("Failed to process PDF", {
-        description: "Could not extract thumbnail and page count",
-      });
+      // toast.error("Failed to process PDF", {
+      //   description: "Could not extract thumbnail and page count",
+      // });
       setPdfInfo({ pageCount: 1, thumbnail: null });
     } finally {
       setIsProcessingPdf(false);

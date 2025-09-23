@@ -256,7 +256,7 @@ export const PDFProvider = ({
         }
       } catch (error: any) {
         if (error.name !== "AbortError") {
-          console.error("Failed to load existing explanations:", error);
+          console.log("Failed to load existing explanations:", error);
         }
       }
     };
@@ -296,7 +296,7 @@ export const PDFProvider = ({
         }
       } catch (error: any) {
         if (error.name !== "AbortError") {
-          console.error("Failed to load existing highlights:", error);
+          console.log("Failed to load existing highlights:", error);
         }
       }
     };
@@ -360,7 +360,7 @@ export const PDFProvider = ({
         }
       } catch (error: any) {
         if (error.name !== "AbortError") {
-          console.error("Failed to load existing threats:", error);
+          console.log("Failed to load existing threats:", error);
         }
       }
     };
@@ -760,7 +760,7 @@ export const PDFProvider = ({
         throw new Error("Backend returned invalid result format");
       }
     } catch (error) {
-      console.error("❌ FRONTEND: Error analyzing PDF for threats:", error);
+      console.log("❌ FRONTEND: Error analyzing PDF for threats:", error);
       // Set empty result on error
       setThreats({
         pages: [],
@@ -858,7 +858,7 @@ export const PDFProvider = ({
         `✅ THREATS: Analysis complete - Found ${threats.length} threats`,
       );
     } catch (error) {
-      console.error("❌ THREATS: Analysis failed:", error);
+      console.log("❌ THREATS: Analysis failed:", error);
       setStoredThreats([]);
       setThreats(null);
     } finally {
@@ -1209,7 +1209,7 @@ export const PDFProvider = ({
         }
         setHighlights((prev) => prev.filter((h) => h.id !== highlightId));
       } catch (error) {
-        console.error("Failed to delete highlight from backend:", error);
+        console.log("Failed to delete highlight from backend:", error);
         // Still remove from UI as fallback
         if (textLayerRef.current) {
           removeHighlight(textLayerRef.current, highlightId);
@@ -1405,7 +1405,7 @@ export const PDFProvider = ({
           });
         }, 500);
       } catch (error) {
-        console.error("Failed to apply highlights:", error);
+        console.log("Failed to apply highlights:", error);
       }
     }, 150),
     [textLayerRef, highlights, storedThreats],
@@ -1479,7 +1479,7 @@ export const PDFProvider = ({
 
           const pageElement = pagesRefs.current?.get(threatPage.page);
           if (!pageElement) {
-            console.error(
+            console.log(
               `🎯 FRONTEND: Page element for page ${threatPage.page} NOT FOUND in pagesRefs`,
             );
             console.log(
@@ -1504,7 +1504,7 @@ export const PDFProvider = ({
             ".react-pdf__Page__textContent",
           );
           if (!textLayer) {
-            console.error(
+            console.log(
               `🎯 FRONTEND: Text layer not found for page ${threatPage.page}`,
             );
             return;
@@ -1516,7 +1516,7 @@ export const PDFProvider = ({
           );
 
           if (textSpansInPage.length === 0) {
-            console.error(
+            console.log(
               `🎯 FRONTEND: No text spans found in page ${threatPage.page}`,
             );
             return;
@@ -1747,7 +1747,7 @@ export const PDFProvider = ({
           );
         });
       } catch (error) {
-        console.error("Failed to apply threat highlights:", error);
+        console.log("Failed to apply threat highlights:", error);
       }
     }, 150),
     [textLayerRef, threats, pagesRefs], // 🔧 FIX: Remove pageNumber dependency
@@ -1779,7 +1779,7 @@ export const PDFProvider = ({
         ),
       );
     } catch (error) {
-      console.error("Failed to update highlight in backend:", error);
+      console.log("Failed to update highlight in backend:", error);
       // Still update in frontend as fallback
       setHighlights((prev) =>
         prev.map((highlight) =>

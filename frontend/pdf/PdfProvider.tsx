@@ -366,7 +366,7 @@ export const PDFProvider = ({
     };
 
     loadExistingThreats();
-  }, [documentId]);
+  }, [documentId,numPages]);
 
   // Intersection Observer to track visible pages
   useEffect(() => {
@@ -695,8 +695,6 @@ export const PDFProvider = ({
       if (result.success && result.threatHighlights) {
         // Convert threat highlights to the format expected by PdfThreats component
         const threatsByPage: { [pageNumber: number]: any[] } = {};
-
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         result.threatHighlights.forEach((threatHighlight: any) => {
           const pageNumber = threatHighlight.position?.pageNumber || 1;
           if (!threatsByPage[pageNumber]) {
@@ -1853,7 +1851,7 @@ export const PDFProvider = ({
     return () => {
       document.removeEventListener("threats-ready", handleThreatsReady);
     };
-  }, [applyThreatsToTextLayer]);
+  }, [applyThreatsToTextLayer,applyHighlightsToTextLayer]);
 
   // Sync zoom input with zoom level changes
   useEffect(() => {

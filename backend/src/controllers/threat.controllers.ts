@@ -340,7 +340,7 @@ export const analyzeNewThreats = async (req: Request, res: Response) => {
             severity: threat.severity?.toUpperCase() || "HIGH",
             category: threat.category || "Unknown",
             confidence: 1.0,
-            position: Prisma.JsonNull, // Frontend will calculate and update this
+            position: Prisma.JsonNull, 
           },
         });
 
@@ -353,7 +353,7 @@ export const analyzeNewThreats = async (req: Request, res: Response) => {
           page: pageNumber,
           number: threatNumber,
           confidence: 1.0,
-          position: null, // Frontend will calculate and update this
+          position: null, 
         });
 
         threatNumber++;

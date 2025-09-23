@@ -15,7 +15,7 @@ import {
   Trash2Icon,
 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState, useTransition } from "react";
-import { Document, Page } from "react-pdf";
+import { Document, Page, pdfjs } from "react-pdf";
 import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import {
@@ -71,6 +71,34 @@ interface TextSelection {
  * @returns {JSX.Element} The PDF viewer component
  */
 export default function PdfViewer({ className = "" }: { className?: string }) {
+  // ========================================
+  // WORKER INITIALIZATION CHECK
+  // ========================================
+  
+  const [workerReady, setWorkerReady] = useState(false);
+
+  // Ensure PDF.js worker is properly initialized
+  useEffect(() => {
+    const initializeWorker = async () => {
+      try {
+        // Check if worker is already configured
+        if (!pdfjs.GlobalWorkerOptions.workerSrc) {
+          console.warn("PDF.js worker not configured, setting fallback");
+          pdfjs.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjs.version}/pdf.worker.min.js`;
+        }
+        
+        // Wait a brief moment for worker to initialize
+        await new Promise(resolve => setTimeout(resolve, 100));
+        setWorkerReady(true);
+      } catch (error) {
+        console.error("Failed to initialize PDF worker:", error);
+        setWorkerReady(true); // Still try to render
+      }
+    };
+    
+    initializeWorker();
+  }, []);
+
   // ========================================
   // STATE MANAGEMENT
   // ========================================
@@ -565,6 +593,17 @@ export default function PdfViewer({ className = "" }: { className?: string }) {
     };
   }, []);
 
+  // Early return with loading state if worker not ready or essential data missing
+  if (!workerReady || !pdfUrl) {
+    return (
+      <div className={cn("flex-1 overflow-auto", className)}>
+        <div className="flex h-full items-center justify-center">
+          <LoaderCircleIcon className="h-8 w-8 animate-spin" />
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div
       ref={textLayerRef}
@@ -580,6 +619,9 @@ export default function PdfViewer({ className = "" }: { className?: string }) {
       <Document
         file={pdfUrl}
         onLoadSuccess={onLoadSuccess}
+        onLoadError={(error) => {
+          console.error("PDF load error:", error);
+        }}
         className={cn(
           "flex flex-col",
           // For floating toolbar, add padding to avoid overlap
@@ -596,25 +638,43 @@ export default function PdfViewer({ className = "" }: { className?: string }) {
             <LoaderCircleIcon className="mx-auto size-10 h-full animate-spin" />
           </div>
         }
+        error={
+          <div className="flex h-full items-center justify-center">
+            <div className="text-center">
+              <p className="text-red-500">Failed to load PDF</p>
+            </div>
+          </div>
+        }
       >
         {numPages &&
-          Array.from({ length: numPages }, (_, i) => (
-            <div
-              key={i + 1}
-              ref={setPageRef(i + 1)}
-              data-page-number={i + 1}
-              className="mx-auto p-10"
-            >
-              <Page
-                pageIndex={i}
-                width={pdfWidth}
-                renderAnnotationLayer={false}
-                renderTextLayer={true}
-                onRenderTextLayerSuccess={applyHighlightsToTextLayer}
-                className="border-border border bg-white shadow-lg"
-              />
-            </div>
-          ))}
+          Array.from({ length: numPages }, (_, i) => {
+            // Add safety check before rendering each page
+            try {
+              return (
+                <div
+                  key={i + 1}
+                  ref={setPageRef(i + 1)}
+                  data-page-number={i + 1}
+                  className="mx-auto p-10"
+                >
+                  <Page
+                    pageIndex={i}
+                    width={pdfWidth}
+                    renderAnnotationLayer={false}
+                    renderTextLayer={true}
+                    onRenderTextLayerSuccess={applyHighlightsToTextLayer}
+                    onRenderError={(error) => {
+                      console.error(`Error rendering page ${i + 1}:`, error);
+                    }}
+                    className="border-border border bg-white shadow-lg"
+                  />
+                </div>
+              );
+            } catch (error) {
+              console.error(`Failed to create page ${i + 1}:`, error);
+              return null;
+            }
+          })}
       </Document>
 
       <AnimatePresence>

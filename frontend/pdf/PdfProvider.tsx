@@ -141,10 +141,18 @@ type PDFContextType = {
 };
 const PDFContext = createContext<PDFContextType | undefined>(undefined);
 
-pdfjs.GlobalWorkerOptions.workerSrc = new URL(
-  "pdfjs-dist/build/pdf.worker.min.mjs",
-  import.meta.url,
-).toString();
+// Configure PDF.js worker with safety checks
+if (typeof window !== 'undefined' && !pdfjs.GlobalWorkerOptions.workerSrc) {
+  try {
+    pdfjs.GlobalWorkerOptions.workerSrc = new URL(
+      "pdfjs-dist/build/pdf.worker.min.mjs",
+      import.meta.url,
+    ).toString();
+  } catch (error) {
+    console.warn("Failed to configure PDF.js worker, falling back to CDN:", error);
+    pdfjs.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjs.version}/pdf.worker.min.js`;
+  }
+}
 
 export const PDFProvider = ({
   pdfUrl,

@@ -36,11 +36,7 @@ import { toast } from "sonner";
 import { pdfjs } from "react-pdf";
 import { AnimatePresence, motion } from "motion/react";
 
-// Set up PDF.js worker
-pdfjs.GlobalWorkerOptions.workerSrc = new URL(
-  "pdfjs-dist/build/pdf.worker.min.mjs",
-  import.meta.url,
-).toString();
+// Note: PDF.js worker is configured in PdfProvider.tsx to avoid conflicts
 
 // Validation schema based on Document model
 const documentSchema = z.object({

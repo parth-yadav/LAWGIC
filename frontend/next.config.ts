@@ -1,6 +1,24 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  webpack: (config: any) => {
+    // Handle PDF.js worker properly for Next.js 15
+    config.resolve.alias = {
+      ...config.resolve.alias,
+      canvas: false,
+    };
+    
+    // Ensure worker files are treated as assets
+    config.module.rules.push({
+      test: /pdf\.worker\.(min\.)?mjs$/,
+      type: 'asset/resource',
+      generator: {
+        filename: 'static/worker/[hash][ext][query]'
+      }
+    });
+    
+    return config;
+  },
   images: {
     remotePatterns: [
       {

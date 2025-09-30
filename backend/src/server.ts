@@ -16,10 +16,7 @@ const PORT = process.env.PORT || 6900;
 
 app.use(
   cors({
-    origin: (origin, callback) => {
-      if (!origin) return callback(null, true);
-      return callback(null, origin);
-    },
+    origin: process.env.CLIENT_BASE_URL,
     credentials: true,
   })
 );

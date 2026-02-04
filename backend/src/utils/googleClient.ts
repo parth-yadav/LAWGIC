@@ -1,8 +1,14 @@
 import { OAuth2Client } from "google-auth-library";
-import { googleClientId, googleClientSecret, googleRedirectUrl } from "./auth.js";
+import { getGoogleClientId, getGoogleClientSecret, getGoogleRedirectUrl } from "./auth.js";
 
-export const oAuth2Client = new OAuth2Client(
-  googleClientId,
-  googleClientSecret,
-  googleRedirectUrl
-);
+// Create OAuth2Client dynamically to ensure environment variables are loaded
+export const getOAuth2Client = () => {
+  return new OAuth2Client(
+    getGoogleClientId(),
+    getGoogleClientSecret(),
+    getGoogleRedirectUrl()
+  );
+};
+
+// Use the dynamic client
+export const oAuth2Client = getOAuth2Client();

@@ -5,6 +5,9 @@ import {
   accessTokenExpiry,
   clientBaseUrl,
   getExpiryDate,
+  getGoogleClientId,
+  getGoogleClientSecret,
+  getGoogleRedirectUrl,
   refreshSecret,
   refreshTokenCookieOptions,
   refreshTokenExpiry,
@@ -15,7 +18,7 @@ import ms, { StringValue } from "ms";
 import { getErrorMessage } from "../utils/utils.js";
 import { Request, Response } from "express";
 import { sendResponse } from "../utils/ResponseHelpers.js";
-import { oAuth2Client } from "../utils/googleClient.js";
+import { getOAuth2Client } from "../utils/googleClient.js";
 import { User } from "@prisma/client";
 import crypto from "crypto";
 import sendMail from "../utils/sendMail.js";
@@ -347,6 +350,15 @@ export const emailVerify = async (req: Request, res: Response) => {
 
 export const googleAuthUrl = (_req: Request, res: Response) => {
   try {
+    // Debug logging
+    const clientId = getGoogleClientId();
+    const clientSecret = getGoogleClientSecret();
+    const redirectUrl = getGoogleRedirectUrl();
+    console.log("Google Client ID:", clientId ? "Present" : "Missing");
+    console.log("Google Client Secret:", clientSecret ? "Present" : "Missing");
+    console.log("Google Redirect URL:", redirectUrl);
+    
+    const oAuth2Client = getOAuth2Client();
     const authorizeUrl = oAuth2Client.generateAuthUrl({
       access_type: "offline",
       scope: [
@@ -355,12 +367,16 @@ export const googleAuthUrl = (_req: Request, res: Response) => {
       ],
       prompt: "consent",
     });
+    
+    console.log("Generated Auth URL:", authorizeUrl);
+    
     return sendResponse({
       res,
       success: true,
       data: { url: authorizeUrl },
     });
   } catch (error) {
+    console.error("Google Auth URL Error:", error);
     return sendResponse({
       res,
       success: false,
@@ -385,6 +401,7 @@ export const googleAuthCallback = async (req: Request, res: Response) => {
       });
     }
 
+    const oAuth2Client = getOAuth2Client();
     const { tokens } = await oAuth2Client.getToken(code);
 
     oAuth2Client.setCredentials(tokens);

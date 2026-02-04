@@ -1,10 +1,20 @@
 "use client";
-import PDF from "@/pdf";
+import dynamic from "next/dynamic";
 import ApiClient from "@/utils/ApiClient";
 import { getErrorMessage } from "@/utils/utils";
 import { BanIcon, LoaderCircleIcon } from "lucide-react";
 import { useParams } from "next/navigation";
 import { useEffect, useState } from "react";
+
+// Dynamically import PDF component with SSR disabled to prevent pdfjs-dist initialization issues
+const PDF = dynamic(() => import("@/pdf"), {
+  ssr: false,
+  loading: () => (
+    <div className="flex h-full w-full items-center justify-center">
+      <LoaderCircleIcon className="size-14 animate-spin" />
+    </div>
+  ),
+});
 
 export default function Page() {
   const params = useParams<{ documentId: string }>();

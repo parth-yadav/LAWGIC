@@ -15,7 +15,6 @@ import {
   Trash2Icon,
 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState, useTransition } from "react";
-import { Document, Page, pdfjs } from "react-pdf";
 import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import {
@@ -36,6 +35,9 @@ import { Separator } from "@/components/ui/separator";
 import ApiClient from "@/utils/ApiClient";
 import { extractContextText } from "./explain/extractContext";
 import { toast } from "sonner";
+
+// pdfjs reference will be set after dynamic import
+let pdfjsInstance: any = null;
 
 // ========================================
 // TYPES AND INTERFACES
@@ -76,27 +78,47 @@ export default function PdfViewer({ className = "" }: { className?: string }) {
   // ========================================
   
   const [workerReady, setWorkerReady] = useState(false);
+  const [ReactPdfComponents, setReactPdfComponents] = useState<{
+    Document: any;
+    Page: any;
+  } | null>(null);
 
-  // Ensure PDF.js worker is properly initialized
+  // Dynamically import react-pdf and configure worker on client side only
   useEffect(() => {
-    const initializeWorker = async () => {
+    const initializePdf = async () => {
       try {
-        // Check if worker is already configured
-        if (!pdfjs.GlobalWorkerOptions.workerSrc) {
-          console.warn("PDF.js worker not configured, setting fallback");
-          pdfjs.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjs.version}/pdf.worker.min.js`;
-        }
+        console.log("[PdfViewer] Starting PDF.js initialization...");
+        
+        // Dynamically import react-pdf
+        const reactPdf = await import("react-pdf");
+        console.log("[PdfViewer] react-pdf imported successfully");
+        
+        const { Document: Doc, Page: Pg, pdfjs: pdfjsLib } = reactPdf;
+        
+        // Configure worker - use unpkg CDN which is more reliable for ES modules
+        // The URL must be set BEFORE any PDF operations
+        const workerUrl = `https://unpkg.com/pdfjs-dist@${pdfjsLib.version}/build/pdf.worker.min.mjs`;
+        pdfjsLib.GlobalWorkerOptions.workerSrc = workerUrl;
+        
+        console.log("[PdfViewer] Worker configured:", workerUrl);
+        console.log("[PdfViewer] PDF.js version:", pdfjsLib.version);
+        
+        // Store pdfjs reference for other uses
+        pdfjsInstance = pdfjsLib;
+        setReactPdfComponents({ Document: Doc, Page: Pg });
+        console.log("[PdfViewer] Components set, waiting for worker to initialize...");
         
         // Wait a brief moment for worker to initialize
         await new Promise(resolve => setTimeout(resolve, 100));
         setWorkerReady(true);
+        console.log("[PdfViewer] PDF.js initialization complete, worker ready");
       } catch (error) {
-        console.error("Failed to initialize PDF worker:", error);
+        console.error("[PdfViewer] Failed to initialize PDF.js:", error);
         setWorkerReady(true); // Still try to render
       }
     };
     
-    initializeWorker();
+    initializePdf();
   }, []);
 
   // ========================================
@@ -593,8 +615,8 @@ export default function PdfViewer({ className = "" }: { className?: string }) {
     };
   }, []);
 
-  // Early return with loading state if worker not ready or essential data missing
-  if (!workerReady || !pdfUrl) {
+  // Early return with loading state if worker not ready, components not loaded, or essential data missing
+  if (!workerReady || !ReactPdfComponents || !pdfUrl) {
     return (
       <div className={cn("flex-1 overflow-auto", className)}>
         <div className="flex h-full items-center justify-center">
@@ -603,6 +625,8 @@ export default function PdfViewer({ className = "" }: { className?: string }) {
       </div>
     );
   }
+
+  const { Document, Page } = ReactPdfComponents;
 
   return (
     <div

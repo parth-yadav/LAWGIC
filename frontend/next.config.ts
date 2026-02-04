@@ -1,22 +1,23 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  webpack: (config: any) => {
+  // Transpile react-pdf and pdfjs-dist to handle ES module issues
+  transpilePackages: ['react-pdf'],
+  
+  webpack: (config: any, { isServer }: { isServer: boolean }) => {
     // Handle PDF.js worker properly for Next.js 15
     config.resolve.alias = {
       ...config.resolve.alias,
       canvas: false,
     };
     
-    // Ensure worker files are treated as assets
+    // Ensure .mjs files are handled correctly
     config.module.rules.push({
-      test: /pdf\.worker\.(min\.)?mjs$/,
-      type: 'asset/resource',
-      generator: {
-        filename: 'static/worker/[hash][ext][query]'
-      }
+      test: /\.mjs$/,
+      include: /node_modules/,
+      type: 'javascript/auto',
     });
-    
+
     return config;
   },
   images: {

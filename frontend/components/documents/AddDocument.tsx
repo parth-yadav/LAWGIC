@@ -33,10 +33,9 @@ import { z } from "zod";
 import { useState, useRef, useCallback } from "react";
 import ApiClient from "@/utils/ApiClient";
 import { toast } from "sonner";
-import { pdfjs } from "react-pdf";
 import { AnimatePresence, motion } from "motion/react";
 
-// Note: PDF.js worker is configured in PdfProvider.tsx to avoid conflicts
+// Note: PDF.js is dynamically imported to avoid SSR issues with pdfjs-dist
 
 // Validation schema based on Document model
 const documentSchema = z.object({
@@ -89,6 +88,14 @@ export default function AddDocument({
     try {
       const fileUrl = URL.createObjectURL(file);
 
+      // Dynamically import pdfjs to avoid SSR issues
+      const { pdfjs } = await import("react-pdf");
+      
+      // Configure worker if not already configured
+      if (typeof window !== 'undefined' && !pdfjs.GlobalWorkerOptions.workerSrc) {
+        pdfjs.GlobalWorkerOptions.workerSrc = `https://unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`;
+      }
+
       // Load PDF document
       const pdf = await pdfjs.getDocument(fileUrl).promise;
       const pageCount = pdf.numPages;
@@ -108,6 +115,7 @@ export default function AddDocument({
         await page.render({
           canvasContext: context,
           viewport: viewport,
+          canvas: canvas,
         }).promise;
 
         // Convert canvas to blob

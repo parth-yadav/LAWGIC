@@ -46,7 +46,7 @@ export default function Footer() {
               </a>
               <a href="https://github.com/parth-yadav" target="_blank" rel="noopener noreferrer"
                 className="bg-muted hover:bg-muted/80 hover:text-primary hover:ring-ring flex items-center gap-2 rounded-lg px-4 py-2 font-medium transition-all hover:ring-2 hover:shadow-md">
-                <BsGithub size={16} /> Parth Yadav
+                <BsGithub size={16} /> Parth Yadavv
               </a>
               <a href="https://github.com/Krrish2401" target="_blank" rel="noopener noreferrer"
                 className="bg-muted hover:bg-muted/80 hover:text-primary hover:ring-ring flex items-center gap-2 rounded-lg px-4 py-2 font-medium transition-all hover:ring-2 hover:shadow-md">

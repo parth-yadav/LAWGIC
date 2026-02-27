@@ -59,9 +59,10 @@ USER nodejs
 # Expose port
 EXPOSE 6900
 
-# Health check
-HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
-  CMD node -e "require('http').get('http://localhost:6900/health', (res) => { process.exit(res.statusCode === 200 ? 0 : 1) })" || exit 1
+# Note: Do NOT add HEALTHCHECK here — Google Cloud Run manages its own
+# health checks. A Docker HEALTHCHECK creates self-requests that prevent
+# Cloud Run from scaling the instance to zero.
 
-# Start the application
-CMD ["npm", "start"]
+# Start the application directly (not via npm) so SIGTERM reaches Node.js
+# This is critical for Cloud Run graceful shutdown & scale-to-zero
+CMD ["node", "build/server.js"]

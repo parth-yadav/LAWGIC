@@ -1,30 +1,57 @@
-"use client";
+/**
+ * Centralized PDF.js setup for Next.js
+ * 
+ * This file handles PDF.js worker configuration in a way that's compatible
+ * with Next.js's module bundling and SSR.
+ * 
+ * IMPORTANT: Import this file before using any react-pdf components.
+ */
 
-// This file sets up PDF.js worker configuration
-// It should be imported before any react-pdf imports
+import { pdfjs } from "react-pdf";
 
-// Note: Worker is configured dynamically in PdfViewer.tsx to avoid SSR issues
-// This file is kept for reference but the actual configuration happens at runtime
+// Flag to ensure we only configure once
+let isConfigured = false;
 
-export const configurePdfWorker = async () => {
+/**
+ * Configure PDF.js worker. Safe to call multiple times.
+ * Should be called on the client side only.
+ */
+export function configurePdfWorker(): void {
+  // Only run on client side
   if (typeof window === "undefined") {
-    return null;
+    return;
+  }
+
+  // Prevent multiple configurations
+  if (isConfigured) {
+    return;
+  }
+
+  // Check if already configured
+  if (pdfjs.GlobalWorkerOptions.workerSrc) {
+    isConfigured = true;
+    return;
   }
 
   try {
-    const { pdfjs } = await import("react-pdf");
-    
-    // Use unpkg CDN which is more reliable for ES modules
-    const workerUrl = `https://unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`;
-    
-    pdfjs.GlobalWorkerOptions.workerSrc = workerUrl;
-    
-    console.log("[pdfjs-setup] Worker configured:", workerUrl);
-    console.log("[pdfjs-setup] PDF.js version:", pdfjs.version);
-    
-    return pdfjs;
+    // Use the bundled worker from node_modules
+    pdfjs.GlobalWorkerOptions.workerSrc = new URL(
+      "pdfjs-dist/build/pdf.worker.min.mjs",
+      import.meta.url
+    ).toString();
+    isConfigured = true;
+    console.log("PDF.js worker configured successfully");
   } catch (error) {
-    console.error("[pdfjs-setup] Failed to configure worker:", error);
-    return null;
+    console.warn("Failed to configure PDF.js worker with bundled file, using CDN fallback:", error);
+    // Fallback to CDN
+    pdfjs.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjs.version}/pdf.worker.min.mjs`;
+    isConfigured = true;
   }
-};
+}
+
+// Auto-configure on import (client-side only)
+if (typeof window !== "undefined") {
+  configurePdfWorker();
+}
+
+export { pdfjs };

@@ -15,6 +15,9 @@ import {
   Trash2Icon,
 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState, useTransition } from "react";
+import { Document, Page } from "react-pdf";
+// Import centralized PDF.js setup - worker is configured on import
+import "@/pdf/pdfjs-setup";
 import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import {
@@ -73,54 +76,6 @@ interface TextSelection {
  * @returns {JSX.Element} The PDF viewer component
  */
 export default function PdfViewer({ className = "" }: { className?: string }) {
-  // ========================================
-  // WORKER INITIALIZATION CHECK
-  // ========================================
-  
-  const [workerReady, setWorkerReady] = useState(false);
-  const [ReactPdfComponents, setReactPdfComponents] = useState<{
-    Document: any;
-    Page: any;
-  } | null>(null);
-
-  // Dynamically import react-pdf and configure worker on client side only
-  useEffect(() => {
-    const initializePdf = async () => {
-      try {
-        console.log("[PdfViewer] Starting PDF.js initialization...");
-        
-        // Dynamically import react-pdf
-        const reactPdf = await import("react-pdf");
-        console.log("[PdfViewer] react-pdf imported successfully");
-        
-        const { Document: Doc, Page: Pg, pdfjs: pdfjsLib } = reactPdf;
-        
-        // Configure worker - use unpkg CDN which is more reliable for ES modules
-        // The URL must be set BEFORE any PDF operations
-        const workerUrl = `https://unpkg.com/pdfjs-dist@${pdfjsLib.version}/build/pdf.worker.min.mjs`;
-        pdfjsLib.GlobalWorkerOptions.workerSrc = workerUrl;
-        
-        console.log("[PdfViewer] Worker configured:", workerUrl);
-        console.log("[PdfViewer] PDF.js version:", pdfjsLib.version);
-        
-        // Store pdfjs reference for other uses
-        pdfjsInstance = pdfjsLib;
-        setReactPdfComponents({ Document: Doc, Page: Pg });
-        console.log("[PdfViewer] Components set, waiting for worker to initialize...");
-        
-        // Wait a brief moment for worker to initialize
-        await new Promise(resolve => setTimeout(resolve, 100));
-        setWorkerReady(true);
-        console.log("[PdfViewer] PDF.js initialization complete, worker ready");
-      } catch (error) {
-        console.error("[PdfViewer] Failed to initialize PDF.js:", error);
-        setWorkerReady(true); // Still try to render
-      }
-    };
-    
-    initializePdf();
-  }, []);
-
   // ========================================
   // STATE MANAGEMENT
   // ========================================
@@ -615,8 +570,8 @@ export default function PdfViewer({ className = "" }: { className?: string }) {
     };
   }, []);
 
-  // Early return with loading state if worker not ready, components not loaded, or essential data missing
-  if (!workerReady || !ReactPdfComponents || !pdfUrl) {
+  // Early return with loading state if essential data missing
+  if (!pdfUrl) {
     return (
       <div className={cn("flex-1 overflow-auto", className)}>
         <div className="flex h-full items-center justify-center">
@@ -670,35 +625,38 @@ export default function PdfViewer({ className = "" }: { className?: string }) {
           </div>
         }
       >
-        {numPages &&
-          Array.from({ length: numPages }, (_, i) => {
-            // Add safety check before rendering each page
-            try {
-              return (
-                <div
-                  key={i + 1}
-                  ref={setPageRef(i + 1)}
-                  data-page-number={i + 1}
-                  className="mx-auto p-10"
-                >
-                  <Page
-                    pageIndex={i}
-                    width={pdfWidth}
-                    renderAnnotationLayer={false}
-                    renderTextLayer={true}
-                    onRenderTextLayerSuccess={applyHighlightsToTextLayer}
-                    onRenderError={(error) => {
-                      console.error(`Error rendering page ${i + 1}:`, error);
-                    }}
-                    className="border-border border bg-white shadow-lg"
-                  />
-                </div>
-              );
-            } catch (error) {
-              console.error(`Failed to create page ${i + 1}:`, error);
-              return null;
-            }
-          })}
+       {numPages &&
+  Array.from({ length: numPages }, (_, i) => {
+    try {
+      return (
+        <div
+          key={i + 1}
+          ref={setPageRef(i + 1)}
+          data-page-number={i + 1}
+          className="mx-auto p-10 flex justify-center"
+        >
+          {/* Moved the border and shadow to a wrapper div */}
+          <div className="relative border-border border bg-white shadow-lg overflow-hidden">
+            <Page
+              pageIndex={i}
+              width={pdfWidth}
+              renderAnnotationLayer={false}
+              renderTextLayer={true}
+              onRenderTextLayerSuccess={applyHighlightsToTextLayer}
+              onRenderError={(error) => {
+                console.error(`Error rendering page ${i + 1}:`, error);
+              }}
+              // 🔧 THE FIX: Force Tailwind to leave the text layer alone
+              className="[&_.react-pdf__Page__textContent]:!leading-[1.0] [&_.react-pdf__Page__textContent>span]:!leading-[1.0] [&_.react-pdf__Page__textContent]:!tracking-normal"
+            />
+          </div>
+        </div>
+      );
+    } catch (error) {
+      console.error(`Failed to create page ${i + 1}:`, error);
+      return null;
+    }
+  })}
       </Document>
 
       <AnimatePresence>

@@ -1,4 +1,7 @@
-import { getDocument } from "pdfjs-dist";
+import { pdfjs } from "react-pdf";
+import "@/pdf/pdfjs-setup";
+
+const { getDocument } = pdfjs;
 
 export async function extractContextText(pdfUrl, currentPage) {
   try {

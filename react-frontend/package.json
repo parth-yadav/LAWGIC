@@ -32,7 +32,6 @@
     "jspdf-autotable": "^5.0.7",
     "lucide-react": "^0.575.0",
     "motion": "^12.34.3",
-    "pdfjs-dist": "^5.4.624",
     "quill": "^2.0.3",
     "react": "^19.2.0",
     "react-countdown": "^2.3.6",

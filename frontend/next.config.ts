@@ -1,21 +1,17 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  webpack: (config: any) => {
+  webpack: (config: any, { dev }) => {
     // Handle PDF.js worker properly for Next.js 15
     config.resolve.alias = {
       ...config.resolve.alias,
       canvas: false,
     };
     
-    // Ensure worker files are treated as assets
-    config.module.rules.push({
-      test: /pdf\.worker\.(min\.)?mjs$/,
-      type: 'asset/resource',
-      generator: {
-        filename: 'static/worker/[hash][ext][query]'
-      }
-    });
+    // FIX: Override eval-* devtool to prevent Object.defineProperty error with pdfjs-dist 5.4+
+    if (dev && config.devtool && config.devtool.includes("eval")) {
+      config.devtool = "source-map"; // You can also set this to false if source maps aren't needed
+    }
     
     return config;
   },
